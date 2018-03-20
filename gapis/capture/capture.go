@@ -126,8 +126,14 @@ func InitialStateFromGlobalState(ctx context.Context, state *api.GlobalState) (*
 
 // New returns a path to a new capture with the given name, header and commands.
 // The new capture is stored in the database.
-func New(ctx context.Context, name string, header *Header, cmds []api.Cmd) (*path.Capture, error) {
+func New(ctx context.Context, name string, header *Header, initialState *InitialState, cmds []api.Cmd) (*path.Capture, error) {
 	b := newBuilder()
+	for _, state := range initialState.APIs {
+		b.addInitialState(ctx, state)
+	}
+	for _, mem := range initialState.Memory {
+		b.addInitialMemory(ctx, mem)
+	}
 	for _, cmd := range cmds {
 		b.addCmd(ctx, cmd)
 	}
@@ -398,11 +404,12 @@ type builder struct {
 
 func newBuilder() *builder {
 	return &builder{
-		apis:     []api.API{},
-		seenAPIs: map[api.ID]struct{}{},
-		observed: interval.U64RangeList{},
-		cmds:     []api.Cmd{},
-		resIDs:   []id.ID{id.ID{}},
+		apis:         []api.API{},
+		seenAPIs:     map[api.ID]struct{}{},
+		observed:     interval.U64RangeList{},
+		cmds:         []api.Cmd{},
+		resIDs:       []id.ID{id.ID{}},
+		initialState: &InitialState{APIs: map[api.API]api.State{}},
 	}
 }
 
