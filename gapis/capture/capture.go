@@ -19,6 +19,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"math"
 	"sync"
 
 	"github.com/google/gapid/core/app/analytics"
@@ -81,6 +82,46 @@ func init() {
 			return &InitialState{APIs: map[api.API]api.State{}}, nil
 		},
 	)
+}
+
+// InitialStateFromGlobalState creates an initial state from an api.GlobalState
+func InitialStateFromGlobalState(ctx context.Context, state *api.GlobalState) (*InitialState, error) {
+	initObservations := []api.CmdObservation{}
+	pools := []memory.PoolID{}
+	prevOnCreate := state.Memory.OnCreate
+	state.Memory.SetOnCreate(func(poolID memory.PoolID, pool *memory.Pool) {
+		pools = append(pools, poolID)
+	})
+	state.Memory.OnCreate = prevOnCreate
+	for _, poolID := range pools {
+		pool := state.Memory.MustGet(poolID)
+		wholePool := pool.Slice(memory.Range{Base: 0x0, Size: math.MaxUint64})
+		validRanges := wholePool.ValidRanges()
+		if len(validRanges) == 0 {
+			validRanges = []memory.Range{memory.Range{}}
+		}
+		for _, r := range validRanges {
+			resourceID, err := wholePool.Slice(r).ResourceID(ctx)
+			if err != nil {
+				return nil, err
+			}
+			obs := api.CmdObservation{
+				Pool:  poolID,
+				Range: r,
+				ID:    resourceID,
+			}
+			initObservations = append(initObservations, obs)
+		}
+	}
+	apis := make(map[api.API]api.State, len(state.APIs))
+	for id, s := range state.APIs {
+		apis[api.Find(id)] = deep.MustClone(s).(api.State)
+	}
+	initState := InitialState{
+		Memory: initObservations,
+		APIs:   apis,
+	}
+	return &initState, nil
 }
 
 // New returns a path to a new capture with the given name, header and commands.
