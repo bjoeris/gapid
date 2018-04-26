@@ -237,4 +237,15 @@ type (
 	UnpackFlags struct {
 		Verbose bool `help:"if true, then output will not be truncated"`
 	}
+	TrimFlags struct {
+		Gapis    GapisFlags
+		Gapir    GapirFlags
+		Commands bool `help:"Treat every command as its own frame"`
+		Frames   struct {
+			Start int `help:"first frame to include (default 0)"`
+			Count int `help:"number of frames to include: -1 for all frames (default -1)"`
+		}
+		Out string `help:"gfxtrace file to save the trimmed capture"`
+		CommandFilterFlags
+	}
 )
