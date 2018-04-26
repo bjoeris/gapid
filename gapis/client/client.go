@@ -315,3 +315,18 @@ func (c *client) ClientEvent(ctx context.Context, req *service.ClientEventReques
 	_, err := c.client.ClientEvent(ctx, req)
 	return err
 }
+
+func (c *client) TrimCapture(ctx context.Context, capture *path.Capture, start uint64, count int64) (*path.Capture, error) {
+	res, err := c.client.TrimCapture(ctx, &service.TrimCaptureRequest{
+		Capture: capture,
+		Start:   start,
+		Count:   count,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if err := res.GetError(); err != nil {
+		return nil, err.Get()
+	}
+	return res.GetCapture(), nil
+}

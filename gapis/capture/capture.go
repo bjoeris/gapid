@@ -124,6 +124,28 @@ func InitialStateFromGlobalState(ctx context.Context, state *api.GlobalState) (*
 	return &initState, nil
 }
 
+// Trim returns a new capture containing the commands [cmdStart,cmdStart+cmdCount].
+// The initial state of the trimmed capture is the state immediately after command (cmdStart-1).
+// The trimmed capture is stored in the database.
+func (c *Capture) Trim(ctx context.Context, name string, cmdStart api.CmdID, cmdCount int64) (*path.Capture, error) {
+	if cmdCount < 0 {
+		cmdCount = int64(len(c.Commands)) - int64(cmdStart)
+	}
+	cmdEnd := cmdStart + api.CmdID(cmdCount)
+	initCmds := c.Commands[:cmdStart]
+	cmds := c.Commands[cmdStart:cmdEnd]
+	if cmdStart == 0 {
+		return New(ctx, name, c.Header, c.InitialState, cmds)
+	}
+	state := c.NewState(ctx)
+	api.MutateCmds(ctx, state, nil, initCmds...)
+	initState, err := InitialStateFromGlobalState(ctx, state)
+	if err != nil {
+		return nil, err
+	}
+	return New(ctx, name, c.Header, initState, cmds)
+}
+
 // New returns a path to a new capture with the given name, header and commands.
 // The new capture is stored in the database.
 func New(ctx context.Context, name string, header *Header, initialState *InitialState, cmds []api.Cmd) (*path.Capture, error) {

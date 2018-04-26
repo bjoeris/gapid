@@ -252,6 +252,18 @@ message LoadCaptureResponse {
   }
 }
 
+message TrimCaptureRequest {
+  path.Capture capture = 1;
+  uint64 Start = 2;
+  int64 Count = 3;
+}
+message TrimCaptureResponse {
+  oneof res {
+    path.Capture capture = 1;
+    Error error = 2;
+  }
+}
+
 message GetDevicesRequest {}
 message GetDevicesResponse {
   oneof res {
@@ -451,6 +463,11 @@ service Gapid {
   // LoadCapture imports capture data from a local file, returning the new
   // capture identifier.
   rpc LoadCapture(LoadCaptureRequest) returns (LoadCaptureResponse) {}
+
+	// TrimCapture returns a new capture containing the commands in the range start <= id < start + count.
+	// If count < 0, the new capture instead contains commands in the range start <= id.
+	// The initial state of the new capture is the state after executing the commands before start.
+  rpc TrimCapture(TrimCaptureRequest) returns (TrimCaptureResponse) {}
 
   // GetDevices returns the full list of replay devices avaliable to the server.
   // These include local replay devices and any connected Android devices.

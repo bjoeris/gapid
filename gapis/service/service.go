@@ -62,6 +62,11 @@ type Service interface {
 	// capture identifier.
 	LoadCapture(ctx context.Context, path string) (*path.Capture, error)
 
+	// TrimCapture returns a new capture containing the commands in the range start <= id < start + count.
+	// If count < 0, the new capture instead contains commands in the range start <= id.
+	// The initial state of the new capture is the state after executing the commands before start.
+	TrimCapture(ctx context.Context, capture *path.Capture, start uint64, count int64) (*path.Capture, error)
+
 	// GetDevices returns the full list of replay devices avaliable to the server.
 	// These include local replay devices and any connected Android devices.
 	// This list may change over time, as devices are connected and disconnected.

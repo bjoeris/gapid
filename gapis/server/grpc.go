@@ -275,6 +275,15 @@ func (s *grpcServer) LoadCapture(ctx xctx.Context, req *service.LoadCaptureReque
 	return &service.LoadCaptureResponse{Res: &service.LoadCaptureResponse_Capture{Capture: capture}}, nil
 }
 
+func (s *grpcServer) TrimCapture(ctx xctx.Context, req *service.TrimCaptureRequest) (*service.TrimCaptureResponse, error) {
+	defer s.inRPC()()
+	capture, err := s.handler.TrimCapture(s.bindCtx(ctx), req.Capture, req.Start, req.Count)
+	if err := service.NewError(err); err != nil {
+		return &service.TrimCaptureResponse{Res: &service.TrimCaptureResponse_Error{Error: err}}, nil
+	}
+	return &service.TrimCaptureResponse{Res: &service.TrimCaptureResponse_Capture{Capture: capture}}, nil
+}
+
 func (s *grpcServer) GetDevices(ctx xctx.Context, req *service.GetDevicesRequest) (*service.GetDevicesResponse, error) {
 	defer s.inRPC()()
 	devices, err := s.handler.GetDevices(s.bindCtx(ctx))

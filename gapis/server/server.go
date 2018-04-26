@@ -198,6 +198,15 @@ func (s *server) LoadCapture(ctx context.Context, path string) (*path.Capture, e
 	return p, nil
 }
 
+func (s *server) TrimCapture(ctx context.Context, p *path.Capture, start uint64, count int64) (*path.Capture, error) {
+	ctx = log.Enter(ctx, "TrimCapture")
+	c, err := capture.ResolveFromPath(ctx, p)
+	if err != nil {
+		return nil, err
+	}
+	return c.Trim(ctx, c.Name+"_trim", api.CmdID(start), count)
+}
+
 func (s *server) GetDevices(ctx context.Context) ([]*path.Device, error) {
 	ctx = log.Enter(ctx, "GetDevices")
 	s.deviceScanDone.Wait(ctx)
