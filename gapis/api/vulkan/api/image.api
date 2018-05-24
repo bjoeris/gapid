@@ -498,6 +498,21 @@ sub void readImageSubresource(ref!ImageObject image, VkImageSubresourceRange rng
   }
 }
 
+sub void readImageView(ref!ImageViewObject view, VkImageLayout layout) {
+  if (view.Image.Info.ImageType == VK_IMAGE_TYPE_3D) &&
+      ((view.Type == VK_IMAGE_VIEW_TYPE_2D) || (view.Type == VK_IMAGE_VIEW_TYPE_2D_ARRAY)) {
+    rng := VkImageSubresourceRange(
+          aspectMask: view.SubresourceRange.aspectMask,
+          baseMipLevel: view.SubresourceRange.baseMipLevel,
+          levelCount: view.SubresourceRange.levelCount,
+          baseArrayLayer: 0,
+          layerCount: 1)
+    readImageSubresource(view.Image, rng, layout)
+  } else {
+    readImageSubresource(view.Image, view.SubresourceRange, layout)
+  }
+}
+
 sub void writeImageSubresource(ref!ImageObject image, VkImageSubresourceRange rng, VkImageLayout layout) {
   if layout != VK_IMAGE_LAYOUT_UNDEFINED {
     _ = checkImageSubresourceRangeLayout(image, rng, layout)
@@ -527,6 +542,22 @@ sub void writeImageSubresource(ref!ImageObject image, VkImageSubresourceRange rn
     }
   }
 }
+
+sub void writeImageView(ref!ImageViewObject view, VkImageLayout layout) {
+  if (view.Image.Info.ImageType == VK_IMAGE_TYPE_3D) &&
+      ((view.Type == VK_IMAGE_VIEW_TYPE_2D) || (view.Type == VK_IMAGE_VIEW_TYPE_2D_ARRAY)) {
+    rng := VkImageSubresourceRange(
+          aspectMask: view.SubresourceRange.aspectMask,
+          baseMipLevel: view.SubresourceRange.baseMipLevel,
+          levelCount: view.SubresourceRange.levelCount,
+          baseArrayLayer: 0,
+          layerCount: 1)
+    writeImageSubresource(view.Image, rng, layout)
+  } else {
+    writeImageSubresource(view.Image, view.SubresourceRange, layout)
+  }
+}
+
 
 sub void transitionImageLayout(ref!ImageObject img, VkImageSubresourceRange rng, VkImageLayout oldLayout, VkImageLayout newLayout) {
   if oldLayout != VK_IMAGE_LAYOUT_UNDEFINED {

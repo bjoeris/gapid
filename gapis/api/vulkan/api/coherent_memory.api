@@ -106,10 +106,7 @@ sub void readMemoryInImageBindings(map!(u32, ref!VkDescriptorImageInfo) imageBin
   for _, _, v in imageBindings {
     _ = Samplers[v.Sampler]
     if v.ImageView != as!VkImageView(0) {
-      imageViewObj := ImageViews[v.ImageView]
-      imageObj := imageViewObj.Image
-      rng := imageViewObj.SubresourceRange
-      readImageSubresource(imageObj, rng, v.ImageLayout)
+      readImageView(ImageViews[v.ImageView], v.ImageLayout)
     }
   }
 }
@@ -192,10 +189,7 @@ sub void writeMemoryInImageBindings(map!(u32, ref!VkDescriptorImageInfo) imageBi
   for _, _, v in imageBindings {
     _ = Samplers[v.Sampler]
     if v.ImageView != as!VkImageView(0) {
-      imageViewObj := ImageViews[v.ImageView]
-      imageObj := imageViewObj.Image
-      rng := imageViewObj.SubresourceRange
-      writeImageSubresource(imageObj, rng, v.ImageLayout)
+      writeImageView(ImageViews[v.ImageView], v.ImageLayout)
     }
   }
 }
