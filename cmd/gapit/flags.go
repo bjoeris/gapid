@@ -260,6 +260,7 @@ type (
 		URI            string `help:"uri of the application to trace"`
 		API            string `help:"only capture the given API valid options are gles and vulkan"`
 		DumpTrace      string `help:"dump a systrace of gapis"`
+		DumpCPUProf    string `help:"dump a cpu profile of gapis"`
 		StartFrame     int    `help:"perform a MEC trace starting at this frame"`
 		NoOpt          bool   `help:"disables optimization of the replay stream"`
 	}
