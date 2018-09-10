@@ -21,6 +21,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"regexp"
 	"strconv"
@@ -100,20 +101,35 @@ func (verb *benchmarkVerb) Run(ctx context.Context, flags flag.FlagSet) error {
 
 	var writeTrace func(path string, gapisTrace, gapitTrace *bytes.Buffer) error
 
-	if verb.DumpTrace != "" {
-		gapitTrace := &bytes.Buffer{}
-		gapisTrace := &bytes.Buffer{}
-		stopGapitTrace := status.RegisterTracer(gapitTrace)
-		stopGapisTrace, err := client.Profile(ctx, nil, gapisTrace, 1)
+	if verb.DumpCPUProf != "" || verb.DumpTrace != "" {
+		var gapisTrace, gapisPprof *bytes.Buffer
+		if verb.DumpCPUProf != "" {
+			gapisPprof = &bytes.Buffer{}
+			defer func() {
+				err := ioutil.WriteFile(verb.DumpCPUProf, gapisPprof.Bytes(), 0666)
+				if err != nil {
+					log.E(ctx, "Failed to write profile: %v", err)
+				}
+			}()
+		}
+		if verb.DumpTrace != "" {
+			gapitTrace := &bytes.Buffer{}
+			gapisTrace = &bytes.Buffer{}
+			stopGapitTrace := status.RegisterTracer(gapitTrace)
+			defer func() {
+				stopGapitTrace()
+				if err := writeTrace(verb.DumpTrace, gapisTrace, gapitTrace); err != nil {
+					log.E(ctx, "Failed to write trace: %v", err)
+				}
+			}()
+		}
+		stopGapisTrace, err := client.Profile(ctx, gapisPprof, gapisTrace, 1)
 		if err != nil {
 			return err
 		}
-
 		defer func() {
-			stopGapitTrace()
-			stopGapisTrace()
-			if err := writeTrace(verb.DumpTrace, gapisTrace, gapitTrace); err != nil {
-				log.E(ctx, "Failed to write trace: %v", err)
+			if err := stopGapisTrace(); err != nil {
+				log.E(ctx, "Failed to stop gapis trace: %v", err)
 			}
 		}()
 	}
