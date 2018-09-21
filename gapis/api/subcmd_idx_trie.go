@@ -23,7 +23,7 @@ type SubCmdIdxTrie struct {
 	children map[uint64]*SubCmdIdxTrie
 }
 
-// Value returnes the value stored in the trie indexed by the given SubCmdIdx.
+// Value returns the value stored in the trie indexed by the given SubCmdIdx.
 // if no value is found by the given SubCmdIdx, returns nil.
 func (t *SubCmdIdxTrie) Value(indices SubCmdIdx) interface{} {
 	for t != nil && len(indices) > 0 && len(t.children) > 0 {
@@ -31,6 +31,27 @@ func (t *SubCmdIdxTrie) Value(indices SubCmdIdx) interface{} {
 	}
 	if t == nil || len(indices) > 0 {
 		return nil // invalid index
+	}
+	return t.value
+}
+
+// GetDefault returns the value stored in the trie indexed by the given SubCmdIdx.
+// If no value is found by the given SubCmdIdx, the value is set to `d`,
+// and returned.
+func (t *SubCmdIdxTrie) GetDefault(indices SubCmdIdx, d interface{}) interface{} {
+	for _, i := range indices {
+		next, ok := t.children[i]
+		if !ok { // child does not exist - create it
+			if t.children == nil {
+				t.children = map[uint64]*SubCmdIdxTrie{}
+			}
+			next = &SubCmdIdxTrie{}
+			t.children[i] = next
+		}
+		t = next
+	}
+	if t.value == nil {
+		t.value = d
 	}
 	return t.value
 }

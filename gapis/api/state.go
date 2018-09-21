@@ -75,6 +75,7 @@ type GlobalState struct {
 type State interface {
 	// All states belong to an API
 	APIObject
+	Reference
 
 	// Clone returns a deep copy of the state object.
 	Clone(arena.Arena) State

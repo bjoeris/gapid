@@ -93,7 +93,8 @@ func NewDCEBuilder(graph DependencyGraph) *DCEBuilder {
 	}
 	for i, cmd := range b.graph.Capture().Commands {
 		if cmd.Alive() {
-			nodeID := b.graph.GetNodeID(CmdNode{api.SubCmdIdx{uint64(i)}})
+			nodeID := b.graph.GetCmdNodeID((api.CmdID)(i), api.SubCmdIdx{})
+			// nodeID := b.graph.GetNodeID(CmdNode{api.SubCmdIdx{uint64(i)}})
 			if nodeID != NodeNoID && !b.isLive[nodeID] {
 				b.isLive[nodeID] = true
 				b.requestedNodes = append(b.requestedNodes, nodeID)
@@ -147,9 +148,9 @@ func (b *DCEBuilder) Build(ctx context.Context) error {
 	b.buildLiveCmds(ctx)
 
 	b.LogStats(ctx)
-	if config.DebugDeadCodeElimination {
-		b.printAllCmds(ctx)
-	}
+	// if config.DebugDeadCodeElimination {
+	// b.printAllCmds(ctx)
+	// }
 	return nil
 }
 
@@ -163,6 +164,7 @@ func (b *DCEBuilder) LogStats(ctx context.Context) {
 		100*b.numDead/numCmd, b.numDead, b.deadMem/1024/1024,
 		100*b.numLive/numCmd, b.numLive, b.liveMem/1024/1024,
 		dCE2Counter.Get())
+	log.I(ctx, "Live Cmds: %v", b.origCmdIDs)
 }
 
 // Mark as alive all the transitive dependencies of live nodes.
@@ -199,7 +201,8 @@ func (b *DCEBuilder) printAllCmds(ctx context.Context) {
 			cmdStatus := "DEAD "
 			if obsNode.CmdID != api.CmdNoID {
 				ownerIdx := api.SubCmdIdx{uint64(obsNode.CmdID)}
-				ownerNodeID := b.graph.GetNodeID(CmdNode{ownerIdx})
+				// ownerNodeID := b.graph.GetNodeID(CmdNode{ownerIdx})
+				ownerNodeID := b.graph.GetCmdNodeID(api.CmdID(ownerIdx[0]), ownerIdx[1:])
 				if b.isLive[ownerNodeID] {
 					cmdStatus = "ALIVE"
 				}
@@ -330,7 +333,8 @@ func (b *DCEBuilder) processLiveObs(ctx context.Context, obs ObsNode) {
 	if obs.CmdID == api.CmdNoID {
 		return
 	}
-	cmdNode := b.graph.GetNodeID(CmdNode{api.SubCmdIdx{uint64(obs.CmdID)}})
+	// cmdNode := b.graph.GetNodeID(CmdNode{api.SubCmdIdx{uint64(obs.CmdID)}})
+	cmdNode := b.graph.GetCmdNodeID(obs.CmdID, api.SubCmdIdx{})
 	if !b.isLive[cmdNode] {
 		b.orphanObs = append(b.orphanObs, obs)
 	}
@@ -342,7 +346,8 @@ func (b *DCEBuilder) Request(ctx context.Context, fci api.SubCmdIdx) error {
 	if config.DebugDeadCodeElimination {
 		log.I(ctx, "Requesting [%v] %v", fci[0], b.graph.GetCommand(api.CmdID(fci[0])))
 	}
-	nodeID := b.graph.GetNodeID(CmdNode{fci})
+	// nodeID := b.graph.GetNodeID(CmdNode{fci})
+	nodeID := b.graph.GetCmdNodeID((api.CmdID)(fci[0]), fci[1:])
 	if nodeID == NodeNoID {
 		return fmt.Errorf("Requested dependencies of cmd not in graph: %v", fci)
 	}

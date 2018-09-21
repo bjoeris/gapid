@@ -78,7 +78,8 @@ type DependencyGraph interface {
 	GetNode(NodeID) Node
 
 	// GetNodeID returns the NodeID associated with given node data
-	GetNodeID(Node) NodeID
+	// GetNodeID(Node) NodeID
+	GetCmdNodeID(api.CmdID, api.SubCmdIdx) NodeID
 
 	// ForeachCmd iterates over all API calls in the graph.
 	// If IncludeInitialCommands is true, this includes the initial commands
@@ -133,42 +134,49 @@ type obsNodeIDs struct {
 }
 
 type dependencyGraph struct {
-	capture           *capture.Capture
-	cmdNodeIDs        *api.SubCmdIdxTrie
-	initMemoryNodeIDs obsNodeIDs
-	initCmdObsNodeIDs []obsNodeIDs
-	cmdObsNodeIDs     []obsNodeIDs
-	initialCommands   []api.Cmd
-	nodes             []Node
-	numDependencies   uint64
-	dependenciesFrom  [][]NodeID
-	dependenciesTo    [][]NodeID
+	capture    *capture.Capture
+	cmdNodeIDs *api.SubCmdIdxTrie
+	// initMemoryNodeIDs obsNodeIDs
+	// initCmdObsNodeIDs []obsNodeIDs
+	// cmdObsNodeIDs     []obsNodeIDs
+	initialCommands  []api.Cmd
+	nodes            []Node
+	numDependencies  uint64
+	dependenciesFrom [][]NodeID
+	dependenciesTo   [][]NodeID
 
 	config DependencyGraphConfig
 }
 
 // newDependencyGraph constructs a new dependency graph
 func newDependencyGraph(ctx context.Context, config DependencyGraphConfig,
-	c *capture.Capture, initialCmds []api.Cmd) *dependencyGraph {
+	c *capture.Capture, initialCmds []api.Cmd, nodes []Node) *dependencyGraph {
 	g := &dependencyGraph{
-		capture:         c,
-		cmdNodeIDs:      new(api.SubCmdIdxTrie),
-		initialCommands: initialCmds,
-		config:          config,
+		capture:          c,
+		cmdNodeIDs:       new(api.SubCmdIdxTrie),
+		initialCommands:  initialCmds,
+		config:           config,
+		nodes:            nodes,
+		dependenciesFrom: make([][]NodeID, len(nodes)),
 	}
-	numCmds := len(initialCmds) + len(c.Commands)
-	numObservations := countObservations(initialCmds) + countObservations(c.Commands)
-	numNodes := numCmds + numObservations
-	g.nodes = make([]Node, 0, numNodes)
-	g.initCmdObsNodeIDs = make([]obsNodeIDs, len(initialCmds))
-	for i, cmd := range initialCmds {
-		g.initCmdObsNodeIDs[i] = g.addCmdNodes(api.CmdID(i).Derived(), cmd.Extras().Observations())
+	// numCmds := len(initialCmds) + len(c.Commands)
+	// numObservations := countObservations(initialCmds) + countObservations(c.Commands)
+	// numNodes := numCmds + numObservations
+	// g.nodes = make([]Node, 0, numNodes)
+	// g.initCmdObsNodeIDs = make([]obsNodeIDs, len(initialCmds))
+	// for i, cmd := range initialCmds {
+	// 	g.initCmdObsNodeIDs[i] = g.addCmdNodes(api.CmdID(i).Derived(), cmd.Extras().Observations())
+	// }
+	// g.cmdObsNodeIDs = make([]obsNodeIDs, len(c.Commands))
+	// for i, cmd := range c.Commands {
+	// 	g.cmdObsNodeIDs[i] = g.addCmdNodes(api.CmdID(i), cmd.Extras().Observations())
+	// }
+	// g.dependenciesFrom = make([][]NodeID, numNodes)
+	for i, n := range nodes {
+		if c, ok := n.(CmdNode); ok {
+			g.cmdNodeIDs.SetValue(c.Index, (NodeID)(i))
+		}
 	}
-	g.cmdObsNodeIDs = make([]obsNodeIDs, len(c.Commands))
-	for i, cmd := range c.Commands {
-		g.cmdObsNodeIDs[i] = g.addCmdNodes(api.CmdID(i), cmd.Extras().Observations())
-	}
-	g.dependenciesFrom = make([][]NodeID, numNodes)
 	return g
 }
 
@@ -190,42 +198,52 @@ func (g *dependencyGraph) GetNode(nodeID NodeID) Node {
 	return g.nodes[nodeID]
 }
 
-// GetNodeID returns the NodeID associated with given node data
-func (g *dependencyGraph) GetNodeID(node Node) NodeID {
-	if cmdNode, ok := node.(CmdNode); ok {
-		index := cmdNode.Index
-		if len(index) == 0 {
-			return NodeNoID
-		}
-		if !g.config.IncludeInitialCommands && !api.CmdID(index[0]).IsReal() {
-			return NodeNoID
-		}
-		if g.config.MergeSubCmdNodes {
-			index = index[:1]
-		}
-		if val := g.cmdNodeIDs.Value(index); val != nil {
-			return val.(NodeID)
-		}
-	} else if obsNode, ok := node.(ObsNode); ok {
-		cmdID := obsNode.CmdID
-		var obsNodeIDs obsNodeIDs
-		if cmdID == api.CmdNoID {
-			obsNodeIDs = g.initMemoryNodeIDs
-		} else if cmdID.IsReal() {
-			obsNodeIDs = g.cmdObsNodeIDs[cmdID]
-		} else {
-			cmdID = cmdID.Real()
-			obsNodeIDs = g.initCmdObsNodeIDs[cmdID]
-		}
-		index := obsNode.Index
-		if obsNode.IsWrite {
-			return obsNodeIDs.writeNodeIDStart + NodeID(index)
-		} else {
-			return obsNodeIDs.readNodeIDStart + NodeID(index)
-		}
+// GetCmdNodeID returns the NodeID associated with a given (sub)command
+func (g *dependencyGraph) GetCmdNodeID(cmdID api.CmdID, idx api.SubCmdIdx) NodeID {
+	fullIdx := append(api.SubCmdIdx{(uint64)(cmdID)}, idx...)
+	x := g.cmdNodeIDs.Value(fullIdx)
+	if x != nil {
+		return x.(NodeID)
 	}
 	return NodeNoID
 }
+
+// GetNodeID returns the NodeID associated with given node data
+// func (g *dependencyGraph) GetNodeID(node Node) NodeID {
+// 	if cmdNode, ok := node.(CmdNode); ok {
+// 		index := cmdNode.Index
+// 		if len(index) == 0 {
+// 			return NodeNoID
+// 		}
+// 		if !g.config.IncludeInitialCommands && !api.CmdID(index[0]).IsReal() {
+// 			return NodeNoID
+// 		}
+// 		if g.config.MergeSubCmdNodes {
+// 			index = index[:1]
+// 		}
+// 		if val := g.cmdNodeIDs.Value(index); val != nil {
+// 			return val.(NodeID)
+// 		}
+// 	} else if obsNode, ok := node.(ObsNode); ok {
+// 		cmdID := obsNode.CmdID
+// 		var obsNodeIDs obsNodeIDs
+// 		if cmdID == api.CmdNoID {
+// 			obsNodeIDs = g.initMemoryNodeIDs
+// 		} else if cmdID.IsReal() {
+// 			obsNodeIDs = g.cmdObsNodeIDs[cmdID]
+// 		} else {
+// 			cmdID = cmdID.Real()
+// 			obsNodeIDs = g.initCmdObsNodeIDs[cmdID]
+// 		}
+// 		index := obsNode.Index
+// 		if obsNode.IsWrite {
+// 			return obsNodeIDs.writeNodeIDStart + NodeID(index)
+// 		} else {
+// 			return obsNodeIDs.readNodeIDStart + NodeID(index)
+// 		}
+// 	}
+// 	return NodeNoID
+// }
 
 // ForeachCmd iterates over all API calls in the graph.
 // If IncludeInitialCommands is true, this includes the initial commands

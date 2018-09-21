@@ -21,8 +21,9 @@ import (
 // memoryWrite stores a WriteMemEffect, together with a memory span affected by that write.
 // The span may be smaller than the whole write.
 type memoryWrite struct {
-	effect WriteMemEffect
-	span   interval.U64Span
+	// effect WriteMemEffect
+	node NodeID
+	span interval.U64Span
 }
 
 // memoryWriteList represents a collection of memory writes, together with the regions of memory affected by each write.
@@ -73,4 +74,107 @@ func (l *memoryWriteList) Resize(length int) {
 		*l = make(memoryWriteList, length, capacity)
 		copy(*l, old)
 	}
+}
+
+// memoryAccess stores a memory span together with a bool indicating whether that span has been written (true) or only read (false)
+type memoryAccess struct {
+	mode AccessMode
+	span interval.U64Span
+}
+
+// memoryAccessList represents a collection of memory access
+// memoryAccessList implements the `interval.MutableList` interface, enabling the algorithms in `interval` for efficient queries and updates.
+type memoryAccessList []memoryAccess
+
+// Length returns the number of elements in the list
+// Implements `interval.List.Length`
+func (l *memoryAccessList) Length() int {
+	return len(*l)
+}
+
+// GetSpan returns the span for the element at index in the list
+// Implements `interval.List.GetSpan`
+func (l *memoryAccessList) GetSpan(index int) interval.U64Span {
+	return (*l)[index].span
+}
+
+// SetSpan sets the span for the element at index in the list
+// Implements `interval.MutableList.SetSpan`
+func (l *memoryAccessList) SetSpan(index int, span interval.U64Span) {
+	(*l)[index].span = span
+}
+
+// New creates a new element at the specifed index with the specified span
+// Implements `interval.MutableList.New`
+func (l *memoryAccessList) New(index int, span interval.U64Span) {
+	(*l)[index].span = span
+}
+
+// Copy count list entries
+// Implements `interval.MutableList.Copy`
+func (l *memoryAccessList) Copy(to, from, count int) {
+	copy((*l)[to:to+count], (*l)[from:from+count])
+}
+
+// Resize adjusts the length of the array
+// Implements `interval.MutableList.Resize`
+func (l *memoryAccessList) Resize(length int) {
+	if cap(*l) > length {
+		*l = (*l)[:length]
+	} else {
+		old := *l
+		capacity := cap(*l) * 2
+		if capacity < length {
+			capacity = length
+		}
+		*l = make(memoryAccessList, length, capacity)
+		copy(*l, old)
+	}
+}
+
+func (l memoryAccessList) GetValue(index int) interface{} {
+	return l[index].mode
+}
+
+func (l *memoryAccessList) SetValue(index int, value interface{}) {
+	(*l)[index].mode = value.(AccessMode)
+}
+
+func (l *memoryAccessList) Insert(index int, count int) {
+	*l = append(*l, make(memoryAccessList, count)...)
+	if index != len(*l) && count > 0 {
+		copy((*l)[index+count:], (*l)[index:])
+	}
+}
+
+func (l *memoryAccessList) Delete(index int, count int) {
+	if index+count != len(*l) && count > 0 {
+		copy((*l)[index:], (*l)[index+count:])
+	}
+	*l = (*l)[:len(*l)-count]
+}
+
+func (l *memoryAccessList) AddRead(s interval.U64Span) {
+	f := func(x interface{}) interface{} {
+		if x == nil {
+			return ACCESS_READ
+		}
+		m := x.(AccessMode)
+		if m&ACCESS_WRITE == 0 {
+			m |= ACCESS_READ
+		}
+		return m
+	}
+	interval.Update(l, s, f)
+}
+
+func (l *memoryAccessList) AddWrite(s interval.U64Span) {
+	f := func(x interface{}) interface{} {
+		if x == nil {
+			return ACCESS_WRITE
+		}
+		m := x.(AccessMode)
+		return m | ACCESS_WRITE
+	}
+	interval.Update(l, s, f)
 }

@@ -1,0 +1,50 @@
+syntax = "proto3";
+
+import "gapis/memory/memory_pb/memory.proto";
+
+message DependencyGraph {
+  path.Capture capture = 1;
+}
+
+message Node {
+  oneof type {
+    CmdNode cmdNode = 1;
+    ObsNode obsNode = 2;
+  }
+  repeated Write writes = 3;
+  repeated Read reads = 4;
+  repeated ForwardDep forwardDepsTo = 5;
+  repeated ForwardDep forwardDepsFrom = 6;
+}
+
+message CmdNode {
+  repeated uint64 indices = 1;
+}
+
+message ObsNode {
+  memory.Observation observation = 1;
+  bool isWrite = 2;
+}
+
+message Write {
+  Node node = 1;
+  repeated Read reads = 2;
+  oneof type {
+    FragmentWrite fragment = 3;
+    SliceWrite slice = 4;
+  }
+}
+
+message Read {
+  Node node = 1;
+  repeated Write writes = 2;
+  oneof type {
+    FragmentRead fragment = 3;
+    SliceRead slice = 4;
+  }
+}
+
+message ForwardDep {
+  Node node = 1;
+  string depID = 2;
+}

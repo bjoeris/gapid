@@ -95,6 +95,9 @@ func (e externs) notifyPendingCommandAdded(queue VkQueue) {
 		submit:          e.cmd,
 		submissionIndex: append([]uint64(nil), s.SubCmdIdx...),
 	}
+	// if e.w != nil {
+	// 	e.w.SetSubCmdIdx(e.ctx, s.SubCmdIdx)
+	// }
 
 	queueObject.PendingCommandsʷ(e.ctx, e.w).Addʷ(e.ctx, e.w, uint32(queueObject.PendingCommandsʷ(e.ctx, e.w).Lenʷ(e.ctx, e.w)-1), command)
 }
@@ -112,21 +115,33 @@ func (e externs) onCommandAdded(buffer VkCommandBuffer) {
 func (e externs) enterSubcontext() {
 	o := GetState(e.s)
 	o.SubCmdIdx = append(o.SubCmdIdx, 0)
+	// if e.w != nil {
+	// 	e.w.SetSubCmdIdx(e.ctx, o.SubCmdIdx)
+	// }
 }
 
 func (e externs) resetSubcontext() {
 	o := GetState(e.s)
 	o.SubCmdIdx = []uint64(nil)
+	// if e.w != nil {
+	// 	e.w.SetSubCmdIdx(e.ctx, o.SubCmdIdx)
+	// }
 }
 
 func (e externs) leaveSubcontext() {
 	o := GetState(e.s)
 	o.SubCmdIdx = o.SubCmdIdx[:len(o.SubCmdIdx)-1]
+	// if e.w != nil {
+	// 	e.w.SetSubCmdIdx(e.ctx, o.SubCmdIdx)
+	// }
 }
 
 func (e externs) nextSubcontext() {
 	o := GetState(e.s)
 	o.SubCmdIdx[len(o.SubCmdIdx)-1]++
+	// if e.w != nil {
+	// 	e.w.SetSubCmdIdx(e.ctx, o.SubCmdIdx)
+	// }
 }
 
 func (e externs) onPreSubcommand(ref CommandReferenceʳ) {
@@ -136,18 +151,27 @@ func (e externs) onPreSubcommand(ref CommandReferenceʳ) {
 	if o.PreSubcommand != nil {
 		o.PreSubcommand(ref)
 	}
+	if e.w != nil {
+		e.w.OnBeginSubCmd(e.ctx, o.SubCmdIdx)
+	}
 }
 
 func (e externs) onPreProcessCommand(ref CommandReferenceʳ) {
 	o := GetState(e.s)
 	cmd := o.queuedCommands[ref]
 	o.SubCmdIdx = append([]uint64{}, cmd.submissionIndex...)
+	// if e.w != nil {
+	// 	e.w.SetSubCmdIdx(e.ctx, o.SubCmdIdx)
+	// }
 }
 
 func (e externs) onPostSubcommand(ref CommandReferenceʳ) {
 	o := GetState(e.s)
 	if o.PostSubcommand != nil {
 		o.PostSubcommand(ref)
+	}
+	if e.w != nil {
+		e.w.OnEndSubCmd(e.ctx)
 	}
 }
 

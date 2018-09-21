@@ -18,7 +18,7 @@ package config
 const (
 	DebugReplay                = false
 	DebugReplayBuilder         = false
-	DisableDeadCodeElimination = false
+	DisableDeadCodeElimination = true
 	NewDeadCodeElimination     = false
 	DebugDeadCodeElimination   = false
 	DebugDependencyGraph       = false
