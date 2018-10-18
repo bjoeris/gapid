@@ -314,15 +314,17 @@ enum LastSubmissionType {
 @serialize @untracked PresentInfo                       LastPresentInfo
 @serialize LastSubmissionType                           LastSubmission
 @hidden @serialize UsedDescriptorSets                   ProcessedDescriptorSets
-
+@hidden @serialize UsedBuffers                          ProcessedBuffers
 
 @internal class ProcessedDescriptorSet {
-  map!(u32, map!(u32, map!(VkDeviceSize, bool))) bufferOffsets
-  bool shouldReadBuffers
 }
 
 @internal class UsedDescriptorSets {
   map!(VkDescriptorSet, ProcessedDescriptorSet) val
+}
+
+@internal class UsedBuffers { 
+  map!(VkBuffer, bool) val
 }
 
 @hidden bool IsRebuilding

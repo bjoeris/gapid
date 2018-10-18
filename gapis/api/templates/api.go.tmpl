@@ -302,7 +302,7 @@ import (
 {{define "DeclareMap"}}
   {{AssertType $ "Map"}}
 
-  {{$name  := $.Name}}
+  {{$name  := $.Name | GoPublicName}}
   {{$key   := Macro "Go.Type" $.KeyType}}
   {{$value := Macro "Go.Type" $.ValueType}}
 

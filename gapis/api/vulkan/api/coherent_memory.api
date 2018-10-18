@@ -57,10 +57,13 @@ sub void readCoherentMemory(ref!DeviceMemoryObject memory, VkDeviceSize readOffs
 }
 
 sub void readMemoryInBuffer(ref!BufferObject buffer, VkDeviceSize readOffset, VkDeviceSize readSize) {
-  memPieces := getBufferBoundMemoryPiecesInRange(buffer, readOffset, readSize)
-  for _, _, mp in memPieces {
-    readCoherentMemory(mp.DeviceMemory, mp.MemoryOffset, mp.Size)
-    read(mp.DeviceMemory.Data[mp.MemoryOffset:mp.MemoryOffset+mp.Size])
+  if (!buffer.VulkanHandle in ProcessedBuffers.val) {
+    memPieces := getBufferBoundMemoryPiecesInRange(buffer, readOffset, readSize)
+    for _, _, mp in memPieces {
+      readCoherentMemory(mp.DeviceMemory, mp.MemoryOffset, mp.Size)
+      read(mp.DeviceMemory.Data[mp.MemoryOffset:mp.MemoryOffset+mp.Size])
+    }
+    ProcessedBuffers.val[buffer.VulkanHandle] = true
   }
 }
 
@@ -68,14 +71,10 @@ sub void readMemoryInBufferBindings(map!(u32, ref!VkDescriptorBufferInfo) buffer
   for i in (0 .. len(bufferBindings)) {
     bufferBinding := bufferBindings[as!u32(i)]
     if bufferBinding.Buffer != as!VkBuffer(0) {
-      if (bufferBinding.Buffer in Buffers) {
-        offset := switch as!u32(i) in bufferBindingOffsets {
-          case true:
-            bufferBindingOffsets[as!u32(i)]
-          case false:
-            bufferBinding.Offset
+      if !(bufferBinding.Buffer in ProcessedBuffers.val) {
+        if (bufferBinding.Buffer in Buffers) {
+          readMemoryInBuffer(Buffers[bufferBinding.Buffer], 0, 0xFFFFFFFFFFFFFFFF)
         }
-        readMemoryInBuffer(Buffers[bufferBinding.Buffer], offset, bufferBinding.Range)
       }
     }
   }
@@ -92,6 +91,7 @@ sub void readMemoryInBufferViewBindings(map!(u32, VkBufferView) bufferViews) {
   }
 }
 
+@spy_disabled
 sub void readMemoryInImageBindings(map!(u32, ref!VkDescriptorImageInfo) imageBindings) {
   for _, _, v in imageBindings {
     _ = Samplers[v.Sampler]
@@ -239,42 +239,6 @@ sub void readWriteMemoryInBoundDescriptorSets(
         writeMemoryInDescriptorSet(descriptorSet, offsets, true)
         
         descriptors := ProcessedDescriptorSet()
-        descriptors.shouldReadBuffers = false
-        newOffsets := descriptors.bufferOffsets
-        for _, j, jj in offsets {
-          for _, k, v in jj {
-            if (!newOffsets[j][k][v]) {
-              x := newOffsets[j]
-              y := x[k]
-              y[v] = true
-              x[k] = y
-              newOffsets[j] = x
-            }
-            
-          }
-        }
-        descriptors.bufferOffsets = newOffsets
-        ProcessedDescriptorSets.val[descriptorSet.VulkanHandle] = descriptors
-      } else if ProcessedDescriptorSets.val[descriptorSet.VulkanHandle].shouldReadBuffers {
-        offsets := bufferBindingOffsets[as!u32(i)]
-        readMemoryInDescriptorSet(descriptorSet, offsets, false)
-        writeMemoryInDescriptorSet(descriptorSet, offsets, false)
-        
-        descriptors := ProcessedDescriptorSets.val[descriptorSet.VulkanHandle]
-        descriptors.shouldReadBuffers = false
-        newOffsets := descriptors.bufferOffsets
-        for _, j, jj in offsets {
-          for _, k, v in jj {
-            if (!newOffsets[j][k][v]) {
-              x := newOffsets[j]
-              y := x[k]
-              y[v] = true
-              x[k] = y
-              newOffsets[j] = x
-            }
-          }
-        }
-        descriptors.bufferOffsets = newOffsets
         ProcessedDescriptorSets.val[descriptorSet.VulkanHandle] = descriptors
       }
     }
@@ -297,9 +261,10 @@ sub void readCoherentMemoryInImage(ref!ImageObject image) {
 }
 
 sub void readMemoryInCurrentPipelineBoundVertexBuffers(u32 vertexCount, u32 instanceCount, u32 firstVertex, u32 firstInstance) {
-  for _ , _ , vertex_binding in lastDrawInfo().GraphicsPipeline.VertexInputState.BindingDescriptions {
-    if vertex_binding.binding in lastDrawInfo().BoundVertexBuffers {
-      bound_vertex_buffer := lastDrawInfo().BoundVertexBuffers[vertex_binding.binding]
+  ldi := lastDrawInfo()
+  for _ , _ , vertex_binding in ldi.GraphicsPipeline.VertexInputState.BindingDescriptions {
+    if vertex_binding.binding in ldi.BoundVertexBuffers {
+      bound_vertex_buffer := ldi.BoundVertexBuffers[vertex_binding.binding]
       backing_buf := bound_vertex_buffer.Buffer
       if backing_buf.Memory != null {
         start_vertex := switch vertex_binding.inputRate {

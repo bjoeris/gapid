@@ -667,13 +667,8 @@ vkCmdBindDescriptorSetsArgs {
   VkPipelineBindPoint        PipelineBindPoint
   VkPipelineLayout           Layout
   u32                        FirstSet
-  map!(u32, VkDescriptorSet) DescriptorSets
-  map!(u32, u32)             DynamicOffsets
-}
-
-@internal class 
-emptyBufferOffsets {
-  map!(u32, map!(u32, map!(VkDeviceSize, bool))) BufferBindingOffsets
+  dense_map!(u32, u32)             DynamicOffsets
+  dense_map!(u32, VkDescriptorSet) DescriptorSets
 }
 
 sub void dovkCmdBindDescriptorSets(ref!vkCmdBindDescriptorSetsArgs args) {
@@ -701,22 +696,9 @@ sub void dovkCmdBindDescriptorSets(ref!vkCmdBindDescriptorSetsArgs args) {
     if args.DescriptorSets[as!u32(i)] in DescriptorSets {
       set := args.DescriptorSets[as!u32(i)]
       setObj := DescriptorSets[set]
-      currentDescriptorSets[args.FirstSet + as!u32(i)] = DescriptorSets[set]
+      currentDescriptorSets[args.FirstSet + as!u32(i)] = setObj
       desc_set_buf_offsets := bufferBindingOffsets[as!u32(i)+args.FirstSet]
-      hasBeenRead := switch (set in ProcessedDescriptorSets.val) {
-        case true:
-          MutableBool(true)
-        default:
-          MutableBool(false)
-      }
 
-      existingOffsets := switch(hasBeenRead.b) {
-        case true:
-          ProcessedDescriptorSets.val[set].bufferOffsets
-        case false:
-          emptyBufferOffsets().BufferBindingOffsets
-      }
-      
       // Since the pDynamicOffsets point into the bindings in order of
       // binding index, and then array index, we have to loop over all
       // of the Bindings in order of the binding number.
@@ -740,24 +722,6 @@ sub void dovkCmdBindDescriptorSets(ref!vkCmdBindDescriptorSetsArgs args) {
                 dynamic_offset_index.Val
             }
 
-            // If the offset has changed, then we may have to reprocess this
-            // descriptor set.
-            if hasBeenRead.b {
-              if !(as!u32(j) in existingOffsets) {
-                hasBeenRead.b = false
-              } else if !(as!u32(k) in existingOffsets[as!u32(j)]) {
-                hasBeenRead.b = false
-              } else if !(binding_offset in existingOffsets[as!u32(j)][as!u32(k)]) {
-                hasBeenRead.b = false
-              }
-
-              if !hasBeenRead.b {
-                oldSets := ProcessedDescriptorSets.val[set].bufferOffsets
-                ProcessedDescriptorSets.val[set] = 
-                  ProcessedDescriptorSet(oldSets, true)
-
-              }
-            }
             desc_binding_buf_offsets[as!u32(k)] = binding_offset
           }
           desc_set_buf_offsets[as!u32(j)] = desc_binding_buf_offsets
@@ -797,9 +761,10 @@ cmd void vkCmdBindDescriptorSets(
     args.DescriptorSets[i] = sets[i]
   }
 
-  mapPos := as!u32(len(CommandBuffers[commandBuffer].BufferCommands.vkCmdBindDescriptorSets))
-  CommandBuffers[commandBuffer].BufferCommands.vkCmdBindDescriptorSets[mapPos] =
-  args
+  bc := CommandBuffers[commandBuffer].BufferCommands.vkCmdBindDescriptorSets
+
+  mapPos := as!u32(len(bc))
+  bc[mapPos] = args
 
   AddCommand(commandBuffer, cmd_vkCmdBindDescriptorSets, mapPos)
 }

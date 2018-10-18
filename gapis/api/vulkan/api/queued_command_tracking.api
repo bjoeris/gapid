@@ -42,11 +42,12 @@
 
 sub void execPendingCommands(VkQueue queue, bool isRoot) {
   q := Queues[queue]
-  newCmds := emptyMap().m
+  newCmds := emptyDenseMap().m
   signaledQueues := queueMap().m
   processSubcommand := MutableBool()
   processSubcommand.b = true
   ProcessedDescriptorSets = UsedDescriptorSets()
+  ProcessedBuffers = UsedBuffers()
 
   for i in (0 .. len(q.PendingCommands)) {
     cmd := q.PendingCommands[as!u32(i)]
