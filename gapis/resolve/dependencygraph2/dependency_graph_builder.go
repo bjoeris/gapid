@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	"github.com/google/gapid/core/app/benchmark"
+	"github.com/google/gapid/core/app/status"
 	"github.com/google/gapid/core/log"
 	"github.com/google/gapid/core/math/interval"
 	"github.com/google/gapid/gapis/api"
@@ -1160,6 +1161,8 @@ func (b *dependencyGraphBuilder) getObsNodeID(cmdObservation api.CmdObservation,
 
 func BuildDependencyGraph(ctx context.Context, config DependencyGraphConfig,
 	c *capture.Capture, initialCmds []api.Cmd, initialRanges interval.U64RangeList) (DependencyGraph, error) {
+	ctx = status.Start(ctx, "BuildDependencyGraph")
+	defer status.Finish(ctx)
 	b := newDependencyGraphBuilder(ctx, config, c, initialCmds)
 	var state *api.GlobalState
 	if config.IncludeInitialCommands {
@@ -1183,6 +1186,9 @@ func BuildDependencyGraph(ctx context.Context, config DependencyGraphConfig,
 	}
 
 	graph := newDependencyGraph(ctx, config, c, initialCmds, b.Nodes)
+
+	ctx = status.Start(ctx, "SetDependencies")
+	defer status.Finish(ctx)
 
 	for nodeID := range b.NodeStats {
 		b.setDependencies(ctx, graph, (NodeID)(nodeID))
