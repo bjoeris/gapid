@@ -317,7 +317,7 @@ void Map<K, V, DENSE>::Allocation::remove(K key) {
 template<typename K, typename V, bool DENSE>
 void Map<K, V, DENSE>::Allocation::clear() {
     auto elems = els();
-    for (uint64_t i = 0; i < capacity; ++i) {
+    for (uint64_t i = 0; i < capacity && count > 0; ++i) {
         switch(elems[i].used) {
             case GAPIL_MAP_ELEMENT_EMPTY:
             case GAPIL_MAP_ELEMENT_USED:
@@ -333,6 +333,24 @@ void Map<K, V, DENSE>::Allocation::clear() {
         capacity = 0;
         elements = nullptr;
     }
+    count = 0;
+}
+
+template<typename K, typename V, bool DENSE>
+void Map<K, V, DENSE>::Allocation::clear_keep() {
+    auto elems = els();
+    for (uint64_t i = 0; i < capacity && count > 0; ++i) {
+        switch(elems[i].used) {
+            case GAPIL_MAP_ELEMENT_EMPTY:
+            case GAPIL_MAP_ELEMENT_USED:
+                continue;
+            case GAPIL_MAP_ELEMENT_FULL:
+                elems[i].first.~K();
+                elems[i].second.~V();
+                --count;
+        }
+    }
+    memset(elems, 0x00, sizeof(*elems) * capacity);
     count = 0;
 }
 
