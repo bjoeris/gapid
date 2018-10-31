@@ -881,7 +881,14 @@ func (b *dependencyGraphBuilder) addObs(ctx context.Context, index int, obs api.
 // LogStats logs some interesting stats about the graph construction
 func (b *dependencyGraphBuilder) LogStats(ctx context.Context, graph DependencyGraph) {
 	log.I(ctx, "Dependency Graph Stats:")
-	log.I(ctx, "%+v", b.Stats)
+	log.I(ctx, "          NumCmdNodes: %-8v  NumObsNodes: %v", b.Stats.NumCmdNodes, b.Stats.NumObsNodes)
+	log.I(ctx, "          NumFragReads: %-8v  UniqueFragReads: %v", b.Stats.NumFragReads, b.Stats.UniqueFragReads)
+	log.I(ctx, "          NumFragWrites: %-7v  UniqueFragWrites: %v", b.Stats.NumFragWrites, b.Stats.UniqueFragWrites)
+	log.I(ctx, "          NumMemReads: %-9v  UniqueMemReads: %v", b.Stats.NumMemReads, b.Stats.UniqueMemReads)
+	log.I(ctx, "          NumMemWrites: %-8v  UniqueMemWrites: %v", b.Stats.NumMemWrites, b.Stats.UniqueMemWrites)
+	log.I(ctx, "          NumForwardDepOpens: %-4v  NumForwardDepCloses: %-4v  NumForwardDepDrops: %v", b.Stats.NumForwardDepOpens, b.Stats.NumForwardDepCloses, b.Stats.NumForwardDepDrops)
+	log.I(ctx, "          UniqueDeps: %v", b.Stats.UniqueDeps)
+
 	nodeIDs := make([]NodeID, len(b.Nodes))
 	for i := range nodeIDs {
 		nodeIDs[i] = (NodeID)(i)
