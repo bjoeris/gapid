@@ -628,6 +628,8 @@ func (b *dependencyGraphBuilder) OnEndCmd(ctx context.Context, cmdID api.CmdID, 
 }
 
 func (b *dependencyGraphBuilder) OnGet(ctx context.Context, owner api.RefObject, frag api.Fragment, valueRef api.RefObject) {
+	b.NodeStats[b.current.nodeID].NumFragReads++
+	b.Stats.NumFragReads++
 	ownerID := owner.RefID()
 	valueID := valueRef.RefID()
 	if ownerID == api.NilRefID {
@@ -641,9 +643,6 @@ func (b *dependencyGraphBuilder) OnGet(ctx context.Context, owner api.RefObject,
 		}
 	}
 	b.debug(ctx, "  OnGet (%T %d)%v : %d", owner, ownerID, frag, valueID)
-
-	b.NodeStats[b.current.nodeID].NumFragReads++
-	b.Stats.NumFragReads++
 
 	// if ownerFrags, ok := b.current.fragmentAccesses[ownerID]; ok {
 	if ownerFrags, ok := b.current.refAccesses.Get(ownerID); ok {
@@ -679,6 +678,9 @@ func (b *dependencyGraphBuilder) OnGet(ctx context.Context, owner api.RefObject,
 }
 
 func (b *dependencyGraphBuilder) OnSet(ctx context.Context, owner api.RefObject, frag api.Fragment, oldValueRef api.RefObject, newValueRef api.RefObject) {
+	b.NodeStats[b.current.nodeID].NumFragWrites++
+	b.Stats.NumFragWrites++
+
 	ownerID := owner.RefID()
 	newValueID := newValueRef.RefID()
 	if ownerID == api.NilRefID {
@@ -692,9 +694,6 @@ func (b *dependencyGraphBuilder) OnSet(ctx context.Context, owner api.RefObject,
 		}
 	}
 	b.debug(ctx, "  OnSet (%T %d)%v : %d → %d", owner, owner.RefID(), frag, oldValueRef.RefID(), newValueRef.RefID())
-
-	b.NodeStats[b.current.nodeID].NumFragWrites++
-	b.Stats.NumFragWrites++
 
 	if ownerFrags, ok := b.current.refAccesses.Get(ownerID); ok {
 		fa, hasFa := ownerFrags.Get(frag)
