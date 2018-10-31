@@ -348,6 +348,11 @@ type dependencyGraphBuilder struct {
 		NumForwardDepOpens  uint64
 		NumForwardDepCloses uint64
 		NumForwardDepDrops  uint64
+		UniqueFragReads     uint64
+		UniqueFragWrites    uint64
+		UniqueMemReads      uint64
+		UniqueMemWrites     uint64
+		UniqueDeps          uint64
 		NumCmdNodes         uint64
 		NumObsNodes         uint64
 	}
@@ -1109,6 +1114,12 @@ func (b *dependencyGraphBuilder) setDependencies(ctx context.Context, graph *dep
 	}
 
 	b.NodeStats[node].UniqueDeps = (uint64)(len(deps))
+
+	b.Stats.UniqueFragReads += b.NodeStats[node].UniqueFragReads
+	b.Stats.UniqueFragWrites += b.NodeStats[node].UniqueFragWrites
+	b.Stats.UniqueMemReads += b.NodeStats[node].UniqueMemReads
+	b.Stats.UniqueMemWrites += b.NodeStats[node].UniqueMemWrites
+	b.Stats.UniqueDeps += b.NodeStats[node].UniqueDeps
 
 	depSlice := make([]NodeID, len(deps))
 	for d, _ := range deps {
