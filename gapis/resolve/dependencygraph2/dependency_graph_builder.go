@@ -309,6 +309,8 @@ type dependencyGraphBuilder struct {
 	// graph *dependencyGraph
 	capture *capture.Capture
 
+	config DependencyGraphConfig
+
 	// current contains the state of the command node currently being processed
 	current *currentCmdState
 
@@ -363,6 +365,7 @@ func newDependencyGraphBuilder(ctx context.Context, config DependencyGraphConfig
 	c *capture.Capture, initialCmds []api.Cmd) *dependencyGraphBuilder {
 	builder := &dependencyGraphBuilder{
 		capture:                 c,
+		config:                  config,
 		current:                 newCurrentCmdState(),
 		refWrites:               make(map[api.RefID]*refWrites),
 		memoryWrites:            make(map[memory.PoolID]*memoryWriteList),
@@ -583,6 +586,9 @@ func (b *dependencyGraphBuilder) flushSubCmd(ctx context.Context) {
 }
 
 func (b *dependencyGraphBuilder) OnBeginSubCmd(ctx context.Context, subCmdIdx api.SubCmdIdx) {
+	if b.config.MergeSubCmdNodes {
+		return
+	}
 	b.flushSubCmd(ctx)
 
 	b.subCmdStack = append(b.subCmdStack, b.current.subCmdIdx)
@@ -600,6 +606,9 @@ func (b *dependencyGraphBuilder) OnBeginSubCmd(ctx context.Context, subCmdIdx ap
 }
 
 func (b *dependencyGraphBuilder) OnEndSubCmd(ctx context.Context) {
+	if b.config.MergeSubCmdNodes {
+		return
+	}
 	b.flushSubCmd(ctx)
 
 	if len(b.subCmdStack) <= 0 {
