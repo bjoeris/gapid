@@ -347,6 +347,16 @@ func (g *dependencyGraph) Config() DependencyGraphConfig {
 	return g.config
 }
 
+func (g *dependencyGraph) addNode(node Node) NodeID {
+	nodeID := (NodeID)(len(g.nodes))
+	g.nodes = append(g.nodes, node)
+	g.dependenciesFrom = append(g.dependenciesFrom, []NodeID{})
+	if cmdNode, ok := node.(CmdNode); ok {
+		g.cmdNodeIDs.SetValue(cmdNode.Index, nodeID)
+	}
+	return nodeID
+}
+
 func (g *dependencyGraph) setDependencies(src NodeID, targets []NodeID) {
 	g.numDependencies -= (uint64)(len(g.dependenciesFrom[src]))
 	g.numDependencies += (uint64)(len(targets))

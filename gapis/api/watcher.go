@@ -17,6 +17,7 @@ package api
 import (
 	"context"
 	"fmt"
+	"math/bits"
 
 	"github.com/google/gapid/gapis/memory"
 )
@@ -179,11 +180,9 @@ func (m DenseFragmentMap) Get(f Fragment) (interface{}, bool) {
 func (m *DenseFragmentMap) Set(f Fragment, v interface{}) {
 	if d, ok := f.(DenseFragment); ok {
 		i := d.DenseIndex()
-		if i >= len(m.Values) {
-			n := 1
-			for i >= n {
-				n <<= 1
-			}
+		n := len(m.Values)
+		if i >= n {
+			n := 1 << (uint)(bits.Len((uint)(n))+1)
 			newVals := make([]denseFragmentMapEntry, n)
 			copy(newVals, m.Values)
 			m.Values = newVals

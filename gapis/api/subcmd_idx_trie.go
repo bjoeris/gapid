@@ -36,9 +36,9 @@ func (t *SubCmdIdxTrie) Value(indices SubCmdIdx) interface{} {
 }
 
 // GetDefault returns the value stored in the trie indexed by the given SubCmdIdx.
-// If no value is found by the given SubCmdIdx, the value is set to `d`,
+// If no value is found by the given SubCmdIdx, the value is set to `d()`,
 // and returned.
-func (t *SubCmdIdxTrie) GetDefault(indices SubCmdIdx, d interface{}) interface{} {
+func (t *SubCmdIdxTrie) GetDefault(indices SubCmdIdx, d func() interface{}) interface{} {
 	for _, i := range indices {
 		next, ok := t.children[i]
 		if !ok { // child does not exist - create it
@@ -51,7 +51,7 @@ func (t *SubCmdIdxTrie) GetDefault(indices SubCmdIdx, d interface{}) interface{}
 		t = next
 	}
 	if t.value == nil {
-		t.value = d
+		t.value = d()
 	}
 	return t.value
 }
