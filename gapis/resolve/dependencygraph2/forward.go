@@ -48,6 +48,7 @@ type ForwardWatcher interface {
 	OnEndCmd(ctx context.Context, cmdCtx CmdContext) map[NodeID][]ForwardAccess
 	OnBeginSubCmd(ctx context.Context, cmdCtx CmdContext, subCmdCtx CmdContext)
 	OnEndSubCmd(ctx context.Context, cmdCtx CmdContext)
+	Close()
 }
 
 type forwardWatcher struct {
@@ -142,3 +143,5 @@ func (b *forwardWatcher) OnBeginSubCmd(ctx context.Context, cmdCtx CmdContext, s
 func (b *forwardWatcher) OnEndSubCmd(ctx context.Context, cmdCtx CmdContext) {
 	b.Flush(ctx, cmdCtx)
 }
+
+func (b *forwardWatcher) Close() {}

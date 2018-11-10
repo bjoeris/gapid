@@ -16,15 +16,16 @@
 package config
 
 const (
-	DebugReplay                = false
-	DebugReplayBuilder         = false
-	DisableDeadCodeElimination = false
-	NewDeadCodeElimination     = false
-	DeadSubCmdElimination      = false
-	DebugDeadCodeElimination   = false
-	DebugDependencyGraph       = false
-	LogExtrasInTransforms      = false // Logs all commands' extras together with transforms
-	LogMemoryInExtras          = false // Logs all commands' read/write memory observation together with extras
+	DebugReplay                          = false
+	DebugReplayBuilder                   = false
+	DisableDeadCodeElimination           = false
+	NewDeadCodeElimination               = false
+	DeadSubCmdElimination                = false
+	DebugDeadCodeElimination             = false
+	DebugDependencyGraph                 = false
+	MultithreadingDependencyGraphBuilder = true
+	LogExtrasInTransforms                = false // Logs all commands' extras together with transforms
+	LogMemoryInExtras                    = false // Logs all commands' read/write memory observation together with extras
 	// Logs all mappings at the end of the replay from original trace
 	// handles to replay client handles (if handles are reused in the trace
 	// it will only print the last mapping).  Only works for Vulkan.

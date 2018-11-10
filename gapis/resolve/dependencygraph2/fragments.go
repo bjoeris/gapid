@@ -37,6 +37,7 @@ type FragWatcher interface {
 	OnEndCmd(ctx context.Context, cmdCtx CmdContext) map[NodeID][]FragmentAccess
 	OnBeginSubCmd(ctx context.Context, cmdCtx CmdContext, subCmdCtx CmdContext)
 	OnEndSubCmd(ctx context.Context, cmdCtx CmdContext)
+	Close()
 	GetStateRefs() map[api.RefID]RefFrag
 }
 
@@ -390,6 +391,8 @@ func (b *fragWatcher) OnBeginSubCmd(ctx context.Context, cmdCtx CmdContext, subC
 func (b *fragWatcher) OnEndSubCmd(ctx context.Context, cmdCtx CmdContext) {
 	b.Flush(ctx, cmdCtx)
 }
+
+func (b *fragWatcher) Close() {}
 
 func (b *fragWatcher) GetStateRefs() map[api.RefID]RefFrag {
 	return b.stateRefs

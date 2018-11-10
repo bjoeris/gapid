@@ -89,15 +89,29 @@ type dependencyGraphBuilder struct {
 }
 
 // Build a new dependencyGraphBuilder.
-func newDependencyGraphBuilder(ctx context.Context, config DependencyGraphConfig,
+func newDependencyGraphBuilder(ctx context.Context, cfg DependencyGraphConfig,
 	c *capture.Capture, initialCmds []api.Cmd, syncData *sync.Data) *dependencyGraphBuilder {
 	builder := &dependencyGraphBuilder{}
 	builder.capture = c
-	builder.config = config
-	builder.fragWatcher = NewFragWatcher()
-	builder.memWatcher = NewMemWatcher()
-	builder.forwardWatcher = NewForwardWatcher()
-	builder.graphBuilder = NewGraphBuilder(ctx, config, c, initialCmds, syncData)
+	builder.config = cfg
+
+	bufSize := 1024
+	batchSize := 128
+	if !config.MultithreadingDependencyGraphBuilder {
+		bufSize = -1
+	}
+	if bufSize >= 0 {
+		builder.fragWatcher = NewAsyncFragWatcher(bufSize, batchSize)
+		builder.memWatcher = NewAsyncMemWatcher(bufSize, batchSize)
+		builder.forwardWatcher = NewAsyncForwardWatcher(bufSize, batchSize)
+		builder.graphBuilder = NewAsyncGraphBuilder(ctx, cfg, c, initialCmds, syncData, bufSize)
+	} else {
+		builder.fragWatcher = NewFragWatcher()
+		builder.memWatcher = NewMemWatcher()
+		builder.forwardWatcher = NewForwardWatcher()
+		builder.graphBuilder = NewGraphBuilder(ctx, cfg, c, initialCmds, syncData)
+	}
+
 	return builder
 }
 
@@ -358,6 +372,7 @@ func BuildDependencyGraph(ctx context.Context, config DependencyGraphConfig,
 	graph := b.graphBuilder.GetGraph()
 
 	b.LogStats(ctx, false)
+	b.closeWorkers()
 
 	graph.setStateRefs(b.fragWatcher.GetStateRefs())
 
@@ -375,6 +390,13 @@ func (b *dependencyGraphBuilder) cmdCtx() CmdContext {
 		return CmdContext{}
 	}
 	return b.subCmdStack[len(b.subCmdStack)-1]
+}
+
+func (b *dependencyGraphBuilder) closeWorkers() {
+	b.fragWatcher.Close()
+	b.memWatcher.Close()
+	b.forwardWatcher.Close()
+	b.graphBuilder.Close()
 }
 
 type Distribution struct {
