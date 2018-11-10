@@ -38,6 +38,7 @@ type FragWatcher interface {
 	OnEndCmd(ctx context.Context, cmdCtx CmdContext) map[NodeID][]FragmentAccess
 	OnBeginSubCmd(ctx context.Context, cmdCtx CmdContext)
 	OnEndSubCmd(ctx context.Context, cmdCtx CmdContext)
+	Close()
 }
 
 func NewFragWatcher() *fragWatcher {
@@ -373,6 +374,8 @@ func (b *fragWatcher) OnBeginSubCmd(ctx context.Context, cmdCtx CmdContext) {
 func (b *fragWatcher) OnEndSubCmd(ctx context.Context, cmdCtx CmdContext) {
 	b.Flush(ctx, cmdCtx)
 }
+
+func (b *fragWatcher) Close() {}
 
 type nodeSetEntry struct {
 	count int

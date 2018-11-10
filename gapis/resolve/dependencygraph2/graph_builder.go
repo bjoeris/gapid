@@ -34,6 +34,7 @@ type GraphBuilder interface {
 	GetNodeStats(NodeID) *NodeStats
 	GetStats() *GraphBuilderStats
 	GetGraph() *dependencyGraph
+	Close()
 }
 
 type GraphBuilderStats struct {
@@ -209,6 +210,8 @@ func (b *graphBuilder) GetStats() *GraphBuilderStats {
 func (b *graphBuilder) GetGraph() *dependencyGraph {
 	return b.graph
 }
+
+func (b *graphBuilder) Close() {}
 
 func (b *graphBuilder) BuildReverseDependencies() {
 	b.graph.buildDependenciesTo()

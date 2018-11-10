@@ -94,10 +94,19 @@ func newDependencyGraphBuilder(ctx context.Context, config DependencyGraphConfig
 	builder.capture = c
 	builder.config = config
 
-	builder.fragWatcher = NewFragWatcher()
-	builder.memWatcher = NewMemWatcher()
-	builder.forwardWatcher = NewForwardWatcher()
-	builder.graphBuilder = NewGraphBuilder(ctx, config, c, initialCmds)
+	bufSize := 1024
+	batchSize := 128
+	if bufSize >= 0 {
+		builder.fragWatcher = NewAsyncFragWatcher(bufSize, batchSize)
+		builder.memWatcher = NewAsyncMemWatcher(bufSize, batchSize)
+		builder.forwardWatcher = NewAsyncForwardWatcher(bufSize, batchSize)
+		builder.graphBuilder = NewAsyncGraphBuilder(ctx, config, c, initialCmds, bufSize)
+	} else {
+		builder.fragWatcher = NewFragWatcher()
+		builder.memWatcher = NewMemWatcher()
+		builder.forwardWatcher = NewForwardWatcher()
+		builder.graphBuilder = NewGraphBuilder(ctx, config, c, initialCmds)
+	}
 
 	return builder
 }
@@ -353,6 +362,7 @@ func BuildDependencyGraph(ctx context.Context, config DependencyGraphConfig,
 	graph := b.graphBuilder.GetGraph()
 
 	b.LogStats(ctx, false)
+	b.closeWorkers()
 
 	return graph, nil
 }
@@ -368,6 +378,13 @@ func (b *dependencyGraphBuilder) cmdCtx() CmdContext {
 		return CmdContext{}
 	}
 	return b.subCmdStack[len(b.subCmdStack)-1]
+}
+
+func (b *dependencyGraphBuilder) closeWorkers() {
+	b.fragWatcher.Close()
+	b.memWatcher.Close()
+	b.forwardWatcher.Close()
+	b.graphBuilder.Close()
 }
 
 type Distribution struct {
