@@ -137,6 +137,9 @@ func (e externs) onPreSubcommand(ref CommandReferenceʳ) {
 	if o.PreSubcommand != nil {
 		o.PreSubcommand(ref)
 	}
+	if e.w != nil {
+		e.w.OnBeginSubCmd(e.ctx, o.SubCmdIdx)
+	}
 }
 
 func (e externs) onPreProcessCommand(ref CommandReferenceʳ) {
@@ -149,6 +152,9 @@ func (e externs) onPostSubcommand(ref CommandReferenceʳ) {
 	o := GetState(e.s)
 	if o.PostSubcommand != nil {
 		o.PostSubcommand(ref)
+	}
+	if e.w != nil {
+		e.w.OnEndSubCmd(e.ctx)
 	}
 }
 
