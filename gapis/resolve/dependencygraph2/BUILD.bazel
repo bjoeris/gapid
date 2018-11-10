@@ -18,6 +18,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 go_library(
     name = "go_default_library",
     srcs = [
+        "async.go",
         "dce.go",
         "dependency_graph.go",
         "dependency_graph_builder.go",

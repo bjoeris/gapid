@@ -38,6 +38,7 @@ type GraphBuilder interface {
 	GetGraph() *dependencyGraph
 	OnBeginCmd(ctx context.Context, cmdCtx CmdContext)
 	OnBeginSubCmd(ctx context.Context, cmdCtx CmdContext, subCmdCtx CmdContext)
+	Close()
 }
 
 type GraphBuilderStats struct {
@@ -285,6 +286,8 @@ func (b *graphBuilder) OnBeginSubCmd(ctx context.Context, cmdCtx CmdContext, sub
 		}
 	}
 }
+
+func (b *graphBuilder) Close() {}
 
 func (b *graphBuilder) BuildReverseDependencies() {
 	b.graph.buildDependenciesTo()

@@ -42,6 +42,7 @@ type MemWatcher interface {
 	OnEndCmd(ctx context.Context, cmdCtx CmdContext) map[NodeID][]MemoryAccess
 	OnBeginSubCmd(ctx context.Context, cmdCtx CmdContext, subCmdCtx CmdContext)
 	OnEndSubCmd(ctx context.Context, cmdCtx CmdContext)
+	Close()
 }
 
 func NewMemWatcher() *memWatcher {
@@ -187,6 +188,8 @@ func (b *memWatcher) addObs(ctx context.Context, cmdCtx CmdContext, obs api.CmdO
 			Mode: ACCESS_WRITE,
 		}}
 }
+
+func (b *memWatcher) Close() {}
 
 // observationSlice constructs a Slice from a CmdObservation
 func observationSlice(obs api.CmdObservation) memory.Slice {
