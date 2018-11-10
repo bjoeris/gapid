@@ -25,6 +25,7 @@ import (
 	"github.com/google/gapid/core/math/interval"
 	"github.com/google/gapid/gapis/api"
 	"github.com/google/gapid/gapis/capture"
+	"github.com/google/gapid/gapis/config"
 	"github.com/google/gapid/gapis/memory"
 )
 
@@ -73,7 +74,7 @@ type dependencyGraphBuilder struct {
 
 	graphBuilder GraphBuilder
 
-	cmdCtx CmdContext
+	subCmdStack []CmdContext
 
 	Stats struct {
 		NumFragReads        uint64
@@ -103,16 +104,24 @@ func newDependencyGraphBuilder(ctx context.Context, config DependencyGraphConfig
 
 // BeginCmd is called at the beginning of each API call
 func (b *dependencyGraphBuilder) OnBeginCmd(ctx context.Context, cmdID api.CmdID, cmd api.Cmd) {
-	cmdCtx := b.graphBuilder.GetCmdContext(cmdID, cmd)
+	if len(b.subCmdStack) > 0 {
+		log.E(ctx, "OnBeginCmd called while processing another command")
+		b.subCmdStack = b.subCmdStack[:0]
+	}
+	idx := api.SubCmdIdx{}
+	cmdCtx := b.graphBuilder.GetCmdContext(cmdID, cmd, idx, 0)
 	b.fragWatcher.OnBeginCmd(ctx, cmdCtx)
 	b.memWatcher.OnBeginCmd(ctx, cmdCtx)
 	b.forwardWatcher.OnBeginCmd(ctx, cmdCtx)
-	b.cmdCtx = cmdCtx
+	b.subCmdStack = append(b.subCmdStack, cmdCtx)
 }
 
 // EndCmd is called at the end of each API call
 func (b *dependencyGraphBuilder) OnEndCmd(ctx context.Context, cmdID api.CmdID, cmd api.Cmd) {
-	cmdCtx := b.cmdCtx
+	if len(b.subCmdStack) > 1 {
+		log.E(ctx, "OnEndCmd called while still processing subcommands")
+	}
+	cmdCtx := b.cmdCtx()
 
 	fragAcc := b.fragWatcher.OnEndCmd(ctx, cmdCtx)
 	memAcc := b.memWatcher.OnEndCmd(ctx, cmdCtx)
@@ -120,18 +129,51 @@ func (b *dependencyGraphBuilder) OnEndCmd(ctx context.Context, cmdID api.CmdID, 
 
 	b.graphBuilder.AddDependencies(fragAcc, memAcc, forwardAcc)
 
-	b.cmdCtx = CmdContext{}
+	b.subCmdStack = b.subCmdStack[:0]
+}
+
+func (b *dependencyGraphBuilder) OnBeginSubCmd(ctx context.Context, subCmdIdx api.SubCmdIdx) {
+	if b.config.MergeSubCmdNodes {
+		return
+	}
+	if len(b.subCmdStack) == 0 {
+		log.E(ctx, "OnBeginSubCmd called while not processing any command")
+	}
+	oldCmdCtx := b.cmdCtx()
+	newCmdCtx := b.graphBuilder.GetCmdContext(oldCmdCtx.cmdID, oldCmdCtx.cmd, subCmdIdx, oldCmdCtx.depth+1)
+
+	b.fragWatcher.OnBeginSubCmd(ctx, newCmdCtx)
+	b.memWatcher.OnBeginSubCmd(ctx, newCmdCtx)
+	b.forwardWatcher.OnBeginSubCmd(ctx, newCmdCtx)
+
+	b.subCmdStack = append(b.subCmdStack, newCmdCtx)
+}
+
+func (b *dependencyGraphBuilder) OnEndSubCmd(ctx context.Context) {
+	if b.config.MergeSubCmdNodes {
+		return
+	}
+	if len(b.subCmdStack) < 2 {
+		log.E(ctx, "OnEndSubCmd called while not processing any subcommand")
+	}
+	cmdCtx := b.cmdCtx()
+
+	b.fragWatcher.OnEndSubCmd(ctx, cmdCtx)
+	b.memWatcher.OnEndSubCmd(ctx, cmdCtx)
+	b.forwardWatcher.OnEndSubCmd(ctx, cmdCtx)
+
+	b.subCmdStack = b.subCmdStack[:len(b.subCmdStack)-1]
 }
 
 func (b *dependencyGraphBuilder) OnGet(ctx context.Context, owner api.RefObject, frag api.Fragment, valueRef api.RefObject) {
-	cmdCtx := b.cmdCtx
+	cmdCtx := b.cmdCtx()
 	cmdCtx.stats.NumFragReads++
 	b.Stats.NumFragReads++
 	b.fragWatcher.OnReadFrag(ctx, cmdCtx, owner, frag, valueRef)
 }
 
 func (b *dependencyGraphBuilder) OnSet(ctx context.Context, owner api.RefObject, frag api.Fragment, oldValueRef api.RefObject, newValueRef api.RefObject) {
-	cmdCtx := b.cmdCtx
+	cmdCtx := b.cmdCtx()
 	cmdCtx.stats.NumFragWrites++
 	b.Stats.NumFragWrites++
 	b.fragWatcher.OnWriteFrag(ctx, cmdCtx, owner, frag, oldValueRef, newValueRef)
@@ -139,7 +181,7 @@ func (b *dependencyGraphBuilder) OnSet(ctx context.Context, owner api.RefObject,
 
 // OnWriteSlice is called when writing to a slice
 func (b *dependencyGraphBuilder) OnWriteSlice(ctx context.Context, slice memory.Slice) {
-	cmdCtx := b.cmdCtx
+	cmdCtx := b.cmdCtx()
 	cmdCtx.stats.NumMemWrites++
 	b.Stats.NumMemWrites++
 	b.memWatcher.OnWriteSlice(ctx, cmdCtx, slice)
@@ -147,7 +189,7 @@ func (b *dependencyGraphBuilder) OnWriteSlice(ctx context.Context, slice memory.
 
 // OnReadSlice is called when reading from a slice
 func (b *dependencyGraphBuilder) OnReadSlice(ctx context.Context, slice memory.Slice) {
-	cmdCtx := b.cmdCtx
+	cmdCtx := b.cmdCtx()
 	cmdCtx.stats.NumMemReads++
 	b.Stats.NumMemReads++
 	b.memWatcher.OnReadSlice(ctx, cmdCtx, slice)
@@ -155,20 +197,20 @@ func (b *dependencyGraphBuilder) OnReadSlice(ctx context.Context, slice memory.S
 
 // OnWriteObs is called when a memory write observation becomes visible
 func (b *dependencyGraphBuilder) OnWriteObs(ctx context.Context, obs []api.CmdObservation) {
-	cmdCtx := b.cmdCtx
+	cmdCtx := b.cmdCtx()
 	b.memWatcher.OnWriteObs(ctx, cmdCtx, obs, b.graphBuilder.GetObsNodeIDs(cmdCtx.cmdID, obs, true))
 }
 
 // OnReadObs is called when a memory read observation becomes visible
 func (b *dependencyGraphBuilder) OnReadObs(ctx context.Context, obs []api.CmdObservation) {
-	cmdCtx := b.cmdCtx
+	cmdCtx := b.cmdCtx()
 	b.memWatcher.OnReadObs(ctx, cmdCtx, obs, b.graphBuilder.GetObsNodeIDs(cmdCtx.cmdID, obs, false))
 }
 
 // OpenForwardDependency is called to begin a forward dependency.
 // See `StateWatcher.OpenForwardDependency` for an explanation of forward dependencies.
 func (b *dependencyGraphBuilder) OpenForwardDependency(ctx context.Context, dependencyID interface{}) {
-	cmdCtx := b.cmdCtx
+	cmdCtx := b.cmdCtx()
 	cmdCtx.stats.NumForwardDepOpens++
 	b.Stats.NumForwardDepOpens++
 	b.forwardWatcher.OpenForwardDependency(ctx, cmdCtx, dependencyID)
@@ -177,7 +219,7 @@ func (b *dependencyGraphBuilder) OpenForwardDependency(ctx context.Context, depe
 // CloseForwardDependency is called to end a forward dependency.
 // See `StateWatcher.OpenForwardDependency` for an explanation of forward dependencies.
 func (b *dependencyGraphBuilder) CloseForwardDependency(ctx context.Context, dependencyID interface{}) {
-	cmdCtx := b.cmdCtx
+	cmdCtx := b.cmdCtx()
 	cmdCtx.stats.NumForwardDepCloses++
 	b.Stats.NumForwardDepCloses++
 	b.forwardWatcher.CloseForwardDependency(ctx, cmdCtx, dependencyID)
@@ -187,7 +229,7 @@ func (b *dependencyGraphBuilder) CloseForwardDependency(ctx context.Context, dep
 // forward dependency, without actually adding the forward dependency.
 // See `StateWatcher.OpenForwardDependency` for an explanation of forward dependencies.
 func (b *dependencyGraphBuilder) DropForwardDependency(ctx context.Context, dependencyID interface{}) {
-	cmdCtx := b.cmdCtx
+	cmdCtx := b.cmdCtx()
 	cmdCtx.stats.NumForwardDepDrops++
 	b.Stats.NumForwardDepDrops++
 	b.forwardWatcher.DropForwardDependency(ctx, cmdCtx, dependencyID)
@@ -315,6 +357,19 @@ func BuildDependencyGraph(ctx context.Context, config DependencyGraphConfig,
 	return graph, nil
 }
 
+func (b *dependencyGraphBuilder) debug(ctx context.Context, fmt string, args ...interface{}) {
+	if config.DebugDependencyGraph || (len(b.cmdCtx().subCmdIdx) == 4 && b.cmdCtx().subCmdIdx[0] == 351 && b.cmdCtx().subCmdIdx[3] == 1) {
+		log.D(ctx, fmt, args...)
+	}
+}
+
+func (b *dependencyGraphBuilder) cmdCtx() CmdContext {
+	if len(b.subCmdStack) == 0 {
+		return CmdContext{}
+	}
+	return b.subCmdStack[len(b.subCmdStack)-1]
+}
+
 type Distribution struct {
 	SmallBins []uint64
 	LargeBins map[uint64]uint64
@@ -332,8 +387,10 @@ func (d Distribution) Add(x uint64) {
 }
 
 type CmdContext struct {
-	cmdID  api.CmdID
-	cmd    api.Cmd
-	nodeID NodeID
-	stats  *NodeStats
+	cmdID     api.CmdID
+	cmd       api.Cmd
+	subCmdIdx api.SubCmdIdx
+	nodeID    NodeID
+	depth     int
+	stats     *NodeStats
 }

@@ -28,9 +28,9 @@ type GraphBuilder interface {
 		map[NodeID][]ForwardAccess)
 	AddNodeDependencies(NodeID, []FragmentAccess, []MemoryAccess, []ForwardAccess)
 	BuildReverseDependencies()
-	GetCmdNodeID(api.CmdID) NodeID
+	GetCmdNodeID(api.CmdID, api.SubCmdIdx) NodeID
 	GetObsNodeIDs(api.CmdID, []api.CmdObservation, bool) []NodeID
-	GetCmdContext(api.CmdID, api.Cmd) CmdContext
+	GetCmdContext(api.CmdID, api.Cmd, api.SubCmdIdx, int) CmdContext
 	GetNodeStats(NodeID) *NodeStats
 	GetStats() *GraphBuilderStats
 	GetGraph() *dependencyGraph
@@ -169,12 +169,12 @@ func (b *graphBuilder) AddNodeDependencies(nodeID NodeID,
 	b.stats.UniqueMemWrites += stats.UniqueMemWrites
 }
 
-func (b *graphBuilder) GetCmdNodeID(cmdID api.CmdID) NodeID {
-	nodeID := b.graph.GetCmdNodeID(cmdID, api.SubCmdIdx{})
+func (b *graphBuilder) GetCmdNodeID(cmdID api.CmdID, idx api.SubCmdIdx) NodeID {
+	nodeID := b.graph.GetCmdNodeID(cmdID, idx)
 	if nodeID != NodeNoID {
 		return nodeID
 	}
-	fullIdx := api.SubCmdIdx{(uint64)(cmdID)}
+	fullIdx := append(api.SubCmdIdx{(uint64)(cmdID)}, idx...)
 	node := CmdNode{fullIdx}
 	return b.addNode(node)
 }
@@ -192,10 +192,10 @@ func (b *graphBuilder) GetObsNodeIDs(cmdID api.CmdID, obs []api.CmdObservation, 
 	return nodeIDs
 }
 
-func (b *graphBuilder) GetCmdContext(cmdID api.CmdID, cmd api.Cmd) CmdContext {
-	nodeID := b.GetCmdNodeID(cmdID)
+func (b *graphBuilder) GetCmdContext(cmdID api.CmdID, cmd api.Cmd, idx api.SubCmdIdx, depth int) CmdContext {
+	nodeID := b.GetCmdNodeID(cmdID, idx)
 	stats := b.nodeStats[nodeID]
-	return CmdContext{cmdID, cmd, nodeID, stats}
+	return CmdContext{cmdID, cmd, idx, nodeID, depth, stats}
 }
 
 func (b *graphBuilder) GetNodeStats(nodeID NodeID) *NodeStats {

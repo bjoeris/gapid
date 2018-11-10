@@ -36,6 +36,8 @@ type FragWatcher interface {
 	OnWriteFrag(ctx context.Context, cmdCtx CmdContext, owner api.RefObject, f api.Fragment, old api.RefObject, new api.RefObject)
 	OnBeginCmd(ctx context.Context, cmdCtx CmdContext)
 	OnEndCmd(ctx context.Context, cmdCtx CmdContext) map[NodeID][]FragmentAccess
+	OnBeginSubCmd(ctx context.Context, cmdCtx CmdContext)
+	OnEndSubCmd(ctx context.Context, cmdCtx CmdContext)
 }
 
 func NewFragWatcher() *fragWatcher {
@@ -64,6 +66,8 @@ func (b *fragWatcher) OnReadFrag(ctx context.Context, cmdCtx CmdContext,
 	owner api.RefObject, frag api.Fragment, value api.RefObject) {
 	ownerID := owner.RefID()
 	valueID := value.RefID()
+	depth := cmdCtx.depth
+	nodeID := cmdCtx.nodeID
 
 	// Ignore reads with nil owner
 	if ownerID == api.NilRefID {
@@ -84,14 +88,14 @@ func (b *fragWatcher) OnReadFrag(ctx context.Context, cmdCtx CmdContext,
 
 		fa, hasFa := ownerFrags.Get(frag)
 		if hasFa {
-			if fa.pending != 0 {
+			if fa.GetMode(depth, nodeID) != 0 {
 				// This read is covered by an earlier access by this command
 				return
 			}
 		}
 
 		if a, ok := ownerFrags.Get(api.CompleteFragment{}); ok {
-			if a.pending != 0 {
+			if a.GetMode(depth, nodeID) != 0 {
 				// This read is covered by an earlier complete access by this command
 				return
 			}
@@ -104,12 +108,12 @@ func (b *fragWatcher) OnReadFrag(ctx context.Context, cmdCtx CmdContext,
 		}
 
 		// Record the read, so that repeated reads of the same fragment are ignored.
-		fa.pending |= ACCESS_READ
+		fa.AddRead(depth, nodeID)
 	} else {
 		// This object has not been accessed since the last `Reset`.
 		ownerFrags := newFragAccesses(owner)
 		fa := &fragAccess{}
-		fa.pending |= ACCESS_READ
+		fa.AddRead(depth, nodeID)
 		ownerFrags.Set(frag, fa)
 		b.refAccesses.Set(ownerID, ownerFrags)
 	}
@@ -129,6 +133,8 @@ func (b *fragWatcher) OnWriteFrag(ctx context.Context, cmdCtx CmdContext,
 	owner api.RefObject, frag api.Fragment, oldVal api.RefObject, newVal api.RefObject) {
 	ownerID := owner.RefID()
 	newValID := newVal.RefID()
+	depth := cmdCtx.depth
+	nodeID := cmdCtx.nodeID
 
 	// Ignore writes with nil owner
 	if ownerID == api.NilRefID {
@@ -148,14 +154,14 @@ func (b *fragWatcher) OnWriteFrag(ctx context.Context, cmdCtx CmdContext,
 		// This object has been accessed since the last `Reset`
 		fa, hasFa := ownerFrags.Get(frag)
 		if hasFa {
-			if fa.pending&ACCESS_WRITE != 0 {
+			if fa.GetMode(depth, nodeID)&ACCESS_WRITE != 0 {
 				// This write is covered by an earlier write by this command
 				return
 			}
 		}
 		ca, hasCa := ownerFrags.Get(api.CompleteFragment{})
 		if hasCa {
-			if ca.pending&ACCESS_WRITE != 0 {
+			if ca.GetMode(depth, nodeID)&ACCESS_WRITE != 0 {
 				// This write is covered by an earlier complete write by this command
 				return
 			}
@@ -171,7 +177,7 @@ func (b *fragWatcher) OnWriteFrag(ctx context.Context, cmdCtx CmdContext,
 			// Clear accesses to all fragments.
 			ownerFrags.ForeachFrag(func(otherFrag api.Fragment, otherAcc *fragAccess) error {
 				if otherFrag != frag {
-					otherAcc.pending = 0
+					otherAcc.Clear()
 
 					// Clear pending writes to individual fragments,
 					// since this will be covered by the complete write
@@ -185,23 +191,23 @@ func (b *fragWatcher) OnWriteFrag(ctx context.Context, cmdCtx CmdContext,
 			// to frag nor to CompleteFragment).
 
 			// Clear previous access to this fragment
-			fa.pending = 0
+			fa.Clear()
 
 			// Clear previous access to the complete fragment, since
 			// part of that access is invalidated by this read.
 			if hasCa {
-				ca.pending = 0
+				ca.Clear()
 			}
 		}
 
 		// Record the write, so that later reads/writes covered by this
 		// write are ignored.
-		fa.pending |= ACCESS_WRITE
+		fa.AddWrite(depth, nodeID)
 	} else {
 		// This object has not been accessed since the last `Reset`.
 		ownerFrags := newFragAccesses(owner)
 		fa := &fragAccess{}
-		fa.pending |= ACCESS_WRITE
+		fa.AddWrite(depth, nodeID)
 		ownerFrags.Set(frag, fa)
 		b.refAccesses.Set(ownerID, ownerFrags)
 	}
@@ -360,6 +366,14 @@ func (b *fragWatcher) OnEndCmd(ctx context.Context, cmdCtx CmdContext) map[NodeI
 	return acc
 }
 
+func (b *fragWatcher) OnBeginSubCmd(ctx context.Context, cmdCtx CmdContext) {
+	b.Flush(ctx, cmdCtx)
+}
+
+func (b *fragWatcher) OnEndSubCmd(ctx context.Context, cmdCtx CmdContext) {
+	b.Flush(ctx, cmdCtx)
+}
+
 type nodeSetEntry struct {
 	count int
 	index int
@@ -427,8 +441,66 @@ func newFragAccesses(owner api.RefObject) fragAccesses {
 }
 
 type fragAccess struct {
+	// Access mode by each subcommand level
+	accessStack []nodeFragAccess
+
 	// Access mode for unflushed accesses
 	pending AccessMode
+}
+
+type nodeFragAccess struct {
+	node NodeID
+	mode AccessMode
+}
+
+func (a fragAccess) GetMode(depth int, node NodeID) AccessMode {
+	if depth >= len(a.accessStack) {
+		return 0
+	}
+	v := a.accessStack[depth]
+	if v.node == node {
+		return v.mode
+	}
+	return 0
+}
+
+func (a *fragAccess) grow(depth int) {
+	if depth >= len(a.accessStack) {
+		n := 1 << uint(bits.Len(uint(depth)))
+		newAccessModes := make([]nodeFragAccess, n)
+		copy(newAccessModes, a.accessStack)
+		a.accessStack = newAccessModes
+	}
+}
+
+func (a *fragAccess) AddRead(depth int, node NodeID) {
+	a.grow(depth)
+	v := &a.accessStack[depth]
+	if v.node == node {
+		v.mode |= ACCESS_READ
+	} else {
+		v.node = node
+		v.mode = ACCESS_READ
+	}
+	a.pending |= ACCESS_READ
+}
+
+func (a *fragAccess) AddWrite(depth int, node NodeID) {
+	a.grow(depth)
+	v := &a.accessStack[depth]
+	if v.node == node {
+		v.mode |= ACCESS_WRITE
+	} else {
+		v.node = node
+		v.mode = ACCESS_WRITE
+	}
+	a.pending |= ACCESS_WRITE
+}
+
+func (a *fragAccess) Clear() {
+	for i := range a.accessStack {
+		a.accessStack[i] = nodeFragAccess{}
+	}
 }
 
 func (a fragAccesses) Get(f api.Fragment) (*fragAccess, bool) {
