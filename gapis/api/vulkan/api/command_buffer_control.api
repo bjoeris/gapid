@@ -369,6 +369,7 @@ cmd VkResult vkEndCommandBuffer(
     VkCommandBuffer commandBuffer) {
   if !(commandBuffer in CommandBuffers) { vkErrorInvalidCommandBuffer(commandBuffer) }
   buff := CommandBuffers[commandBuffer]
+  _ = buff.Recording
   buff.Recording = COMPLETED
   return ?
 }
