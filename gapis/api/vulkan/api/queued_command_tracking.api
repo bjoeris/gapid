@@ -48,7 +48,8 @@ sub void execPendingCommands(VkQueue queue, bool isRoot) {
   processSubcommand.b = true
   ProcessedDescriptorSets = UsedDescriptorSets()
 
-  for i in (0 .. len(q.PendingCommands)) {
+  n := len(q.PendingCommands)
+  for i in (0 .. n) {
     cmd := q.PendingCommands[as!u32(i)]
     if ((len(q.PendingEvents) != 0) || (len(q.PendingSemaphores) != 0)) {
       newCmds[len(newCmds)] = cmd
