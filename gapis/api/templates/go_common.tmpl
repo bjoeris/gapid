@@ -767,7 +767,7 @@
   {{else if IsSlice       $ty}}{{Template "Go.Read" $.Value}}.Count()
   {{else if IsString      $ty}}len({{Template "Go.Read" $.Value}})
   {{else if IsMap         $ty}}
-    {{if Macro "IsUntrackedMap" $.Value}}
+    {{if or (Macro "IsUntrackedMap" $.Value) (Macro "IsUntrackedLen" $.Value)}}
       {{Template "Go.Read" $.Value}}.Len()
     {{else}}
       {{Template "Go.Read" $.Value}}.Lenʷ(ϟctx, ϟw)
@@ -840,5 +840,21 @@
   {{/* Map field marked with @untrackedMap */}}
   {{else if IsMember $}}
     {{if GetAnnotation $.Field "untrackedMap"}}1{{end}}
+  {{end}}
+{{end}}
+
+{{/*
+-------------------------------------------------------------------------------
+  Emits 1 if $ is map marked with @untrackedLen. This works both for global
+  variables and struct members.
+-------------------------------------------------------------------------------
+*/}}
+{{define "IsUntrackedLen"}}
+  {{/* Global map marked with @untrackedLen */}}
+  {{if GetAnnotation $ "untrackedLen"}}1§
+
+  {{/* Map field marked with @untrackedLen */}}
+  {{else if IsMember $}}
+    {{if GetAnnotation $.Field "untrackedLen"}}1{{end}}
   {{end}}
 {{end}}

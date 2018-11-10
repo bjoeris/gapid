@@ -199,53 +199,53 @@ enum SemaphoreUpdate {
 }
 
 @internal class BufferCommands {
-  map!(u32, ref!vkCmdBindPipelineArgs)           vkCmdBindPipeline
-  map!(u32, ref!vkCmdSetViewportArgs)            vkCmdSetViewport
-  map!(u32, ref!vkCmdSetScissorArgs)             vkCmdSetScissor
-  map!(u32, ref!vkCmdSetLineWidthArgs)           vkCmdSetLineWidth
-  map!(u32, ref!vkCmdSetDepthBiasArgs)           vkCmdSetDepthBias
-  map!(u32, ref!vkCmdSetBlendConstantsArgs)      vkCmdSetBlendConstants
-  map!(u32, ref!vkCmdSetDepthBoundsArgs)         vkCmdSetDepthBounds
-  map!(u32, ref!vkCmdSetStencilCompareMaskArgs)  vkCmdSetStencilCompareMask
-  map!(u32, ref!vkCmdSetStencilWriteMaskArgs)    vkCmdSetStencilWriteMask
-  map!(u32, ref!vkCmdSetStencilReferenceArgs)    vkCmdSetStencilReference
-  map!(u32, ref!vkCmdBindDescriptorSetsArgs)     vkCmdBindDescriptorSets
-  map!(u32, ref!vkCmdBindIndexBufferArgs)        vkCmdBindIndexBuffer
-  map!(u32, ref!vkCmdBindVertexBuffersArgs)      vkCmdBindVertexBuffers
-  map!(u32, ref!vkCmdDrawArgs)                   vkCmdDraw
-  map!(u32, ref!vkCmdDrawIndexedArgs)            vkCmdDrawIndexed
-  map!(u32, ref!vkCmdDrawIndirectArgs)           vkCmdDrawIndirect
-  map!(u32, ref!vkCmdDrawIndexedIndirectArgs)    vkCmdDrawIndexedIndirect
-  map!(u32, ref!vkCmdDispatchArgs)               vkCmdDispatch
-  map!(u32, ref!vkCmdDispatchIndirectArgs)       vkCmdDispatchIndirect
-  map!(u32, ref!vkCmdCopyBufferArgs)             vkCmdCopyBuffer
-  map!(u32, ref!vkCmdCopyImageArgs)              vkCmdCopyImage
-  map!(u32, ref!vkCmdBlitImageArgs)              vkCmdBlitImage
-  map!(u32, ref!vkCmdCopyBufferToImageArgs)      vkCmdCopyBufferToImage
-  map!(u32, ref!vkCmdCopyImageToBufferArgs)      vkCmdCopyImageToBuffer
-  map!(u32, ref!vkCmdUpdateBufferArgs)           vkCmdUpdateBuffer
-  map!(u32, ref!vkCmdFillBufferArgs)             vkCmdFillBuffer
-  map!(u32, ref!vkCmdClearColorImageArgs)        vkCmdClearColorImage
-  map!(u32, ref!vkCmdClearDepthStencilImageArgs) vkCmdClearDepthStencilImage
-  map!(u32, ref!vkCmdClearAttachmentsArgs)       vkCmdClearAttachments
-  map!(u32, ref!vkCmdResolveImageArgs)           vkCmdResolveImage
-  map!(u32, ref!vkCmdSetEventArgs)               vkCmdSetEvent
-  map!(u32, ref!vkCmdResetEventArgs)             vkCmdResetEvent
-  map!(u32, ref!vkCmdWaitEventsArgs)             vkCmdWaitEvents
-  map!(u32, ref!vkCmdPipelineBarrierArgs)        vkCmdPipelineBarrier
-  map!(u32, ref!vkCmdBeginQueryArgs)             vkCmdBeginQuery
-  map!(u32, ref!vkCmdEndQueryArgs)               vkCmdEndQuery
-  map!(u32, ref!vkCmdResetQueryPoolArgs)         vkCmdResetQueryPool
-  map!(u32, ref!vkCmdWriteTimestampArgs)         vkCmdWriteTimestamp
-  map!(u32, ref!vkCmdCopyQueryPoolResultsArgs)   vkCmdCopyQueryPoolResults
-  map!(u32, ref!vkCmdPushConstantsArgs)          vkCmdPushConstants
-  map!(u32, ref!vkCmdBeginRenderPassArgs)        vkCmdBeginRenderPass
-  map!(u32, ref!vkCmdNextSubpassArgs)            vkCmdNextSubpass
-  map!(u32, ref!vkCmdEndRenderPassArgs)          vkCmdEndRenderPass
-  map!(u32, ref!vkCmdExecuteCommandsArgs)        vkCmdExecuteCommands
-  map!(u32, ref!vkCmdDebugMarkerBeginEXTArgs)    vkCmdDebugMarkerBeginEXT
-  map!(u32, ref!vkCmdDebugMarkerEndEXTArgs)      vkCmdDebugMarkerEndEXT
-  map!(u32, ref!vkCmdDebugMarkerInsertEXTArgs)   vkCmdDebugMarkerInsertEXT
+  @untrackedLen map!(u32, ref!vkCmdBindPipelineArgs)           vkCmdBindPipeline
+  @untrackedLen map!(u32, ref!vkCmdSetViewportArgs)            vkCmdSetViewport
+  @untrackedLen map!(u32, ref!vkCmdSetScissorArgs)             vkCmdSetScissor
+  @untrackedLen map!(u32, ref!vkCmdSetLineWidthArgs)           vkCmdSetLineWidth
+  @untrackedLen map!(u32, ref!vkCmdSetDepthBiasArgs)           vkCmdSetDepthBias
+  @untrackedLen map!(u32, ref!vkCmdSetBlendConstantsArgs)      vkCmdSetBlendConstants
+  @untrackedLen map!(u32, ref!vkCmdSetDepthBoundsArgs)         vkCmdSetDepthBounds
+  @untrackedLen map!(u32, ref!vkCmdSetStencilCompareMaskArgs)  vkCmdSetStencilCompareMask
+  @untrackedLen map!(u32, ref!vkCmdSetStencilWriteMaskArgs)    vkCmdSetStencilWriteMask
+  @untrackedLen map!(u32, ref!vkCmdSetStencilReferenceArgs)    vkCmdSetStencilReference
+  @untrackedLen map!(u32, ref!vkCmdBindDescriptorSetsArgs)     vkCmdBindDescriptorSets
+  @untrackedLen map!(u32, ref!vkCmdBindIndexBufferArgs)        vkCmdBindIndexBuffer
+  @untrackedLen map!(u32, ref!vkCmdBindVertexBuffersArgs)      vkCmdBindVertexBuffers
+  @untrackedLen map!(u32, ref!vkCmdDrawArgs)                   vkCmdDraw
+  @untrackedLen map!(u32, ref!vkCmdDrawIndexedArgs)            vkCmdDrawIndexed
+  @untrackedLen map!(u32, ref!vkCmdDrawIndirectArgs)           vkCmdDrawIndirect
+  @untrackedLen map!(u32, ref!vkCmdDrawIndexedIndirectArgs)    vkCmdDrawIndexedIndirect
+  @untrackedLen map!(u32, ref!vkCmdDispatchArgs)               vkCmdDispatch
+  @untrackedLen map!(u32, ref!vkCmdDispatchIndirectArgs)       vkCmdDispatchIndirect
+  @untrackedLen map!(u32, ref!vkCmdCopyBufferArgs)             vkCmdCopyBuffer
+  @untrackedLen map!(u32, ref!vkCmdCopyImageArgs)              vkCmdCopyImage
+  @untrackedLen map!(u32, ref!vkCmdBlitImageArgs)              vkCmdBlitImage
+  @untrackedLen map!(u32, ref!vkCmdCopyBufferToImageArgs)      vkCmdCopyBufferToImage
+  @untrackedLen map!(u32, ref!vkCmdCopyImageToBufferArgs)      vkCmdCopyImageToBuffer
+  @untrackedLen map!(u32, ref!vkCmdUpdateBufferArgs)           vkCmdUpdateBuffer
+  @untrackedLen map!(u32, ref!vkCmdFillBufferArgs)             vkCmdFillBuffer
+  @untrackedLen map!(u32, ref!vkCmdClearColorImageArgs)        vkCmdClearColorImage
+  @untrackedLen map!(u32, ref!vkCmdClearDepthStencilImageArgs) vkCmdClearDepthStencilImage
+  @untrackedLen map!(u32, ref!vkCmdClearAttachmentsArgs)       vkCmdClearAttachments
+  @untrackedLen map!(u32, ref!vkCmdResolveImageArgs)           vkCmdResolveImage
+  @untrackedLen map!(u32, ref!vkCmdSetEventArgs)               vkCmdSetEvent
+  @untrackedLen map!(u32, ref!vkCmdResetEventArgs)             vkCmdResetEvent
+  @untrackedLen map!(u32, ref!vkCmdWaitEventsArgs)             vkCmdWaitEvents
+  @untrackedLen map!(u32, ref!vkCmdPipelineBarrierArgs)        vkCmdPipelineBarrier
+  @untrackedLen map!(u32, ref!vkCmdBeginQueryArgs)             vkCmdBeginQuery
+  @untrackedLen map!(u32, ref!vkCmdEndQueryArgs)               vkCmdEndQuery
+  @untrackedLen map!(u32, ref!vkCmdResetQueryPoolArgs)         vkCmdResetQueryPool
+  @untrackedLen map!(u32, ref!vkCmdWriteTimestampArgs)         vkCmdWriteTimestamp
+  @untrackedLen map!(u32, ref!vkCmdCopyQueryPoolResultsArgs)   vkCmdCopyQueryPoolResults
+  @untrackedLen map!(u32, ref!vkCmdPushConstantsArgs)          vkCmdPushConstants
+  @untrackedLen map!(u32, ref!vkCmdBeginRenderPassArgs)        vkCmdBeginRenderPass
+  @untrackedLen map!(u32, ref!vkCmdNextSubpassArgs)            vkCmdNextSubpass
+  @untrackedLen map!(u32, ref!vkCmdEndRenderPassArgs)          vkCmdEndRenderPass
+  @untrackedLen map!(u32, ref!vkCmdExecuteCommandsArgs)        vkCmdExecuteCommands
+  @untrackedLen map!(u32, ref!vkCmdDebugMarkerBeginEXTArgs)    vkCmdDebugMarkerBeginEXT
+  @untrackedLen map!(u32, ref!vkCmdDebugMarkerEndEXTArgs)      vkCmdDebugMarkerEndEXT
+  @untrackedLen map!(u32, ref!vkCmdDebugMarkerInsertEXTArgs)   vkCmdDebugMarkerInsertEXT
 }
 
 @internal class CommandBufferObject {
@@ -254,7 +254,7 @@ enum SemaphoreUpdate {
   @unused VkCommandBuffer                 VulkanHandle
   @unused VkCommandPool                   Pool
   @unused VkCommandBufferLevel            Level
-  @unused dense_map!(u32, ref!CommandReference) CommandReferences
+  @untrackedLen @unused dense_map!(u32, ref!CommandReference) CommandReferences
   @unused BufferCommands                  BufferCommands
   @unused ref!CommandBufferBegin          BeginInfo
   @unused ref!VulkanDebugMarkerInfo       DebugInfo
