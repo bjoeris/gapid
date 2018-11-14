@@ -203,17 +203,24 @@ func (b *DCEBuilder) printAllCmds(ctx context.Context) {
 			cmdID := api.CmdID(cmdNode.Index[0])
 			cmd := b.graph.GetCommand(cmdID)
 			log.D(ctx, "[ %s ] (%v / %v) %v\n", status, cmdID, b.LiveCmdID(cmdID), cmd)
-		} else if obsNode, ok := node.(ObsNode); ok {
-			cmdStatus := "DEAD "
-			if obsNode.CmdID != api.CmdNoID {
-				ownerIdx := api.SubCmdIdx{uint64(obsNode.CmdID)}
-				ownerNodeID := b.graph.GetCmdNodeID(api.CmdID(ownerIdx[0]), ownerIdx[1:])
-				if b.isLive[ownerNodeID] {
-					cmdStatus = "ALIVE"
+		} else if cmdNode, ok := node.(CmdNode); ok && len(cmdNode.Index) > 1 {
+			cmdID := api.CmdID(cmdNode.Index[0])
+			initCmdStr := ""
+			sep := " -> "
+			acc := b.graph.GetNodeAccesses(nodeID)
+			for _, initNodeID := range acc.InitCmdNodes {
+				initNode := b.graph.GetNode(initNodeID)
+				if initCmdNode, ok := initNode.(CmdNode); ok && len(initCmdNode.Index) == 1 {
+					initCmdID := api.CmdID(initCmdNode.Index[0])
+					initCmd := b.graph.GetCommand(initCmdID)
+					initCmdStr += fmt.Sprintf("%s(%v / %v) %v", sep, initCmdID, b.LiveCmdID(initCmdID), initCmd)
+					sep = ", "
 				}
 			}
+			log.D(ctx, "[ %s ] (%v / %v)%s\n", status, cmdNode.Index, b.LiveCmdID(cmdID), initCmdStr)
+		} else if obsNode, ok := node.(ObsNode); ok {
 			liveCmdID := b.LiveCmdID(obsNode.CmdID)
-			log.D(ctx, "[ %s ] (%v [%s] / %v) Range: %v  Pool: %v  ID: %v\n", status, obsNode.CmdID, cmdStatus, liveCmdID, obsNode.CmdObservation.Range, obsNode.CmdObservation.Pool, obsNode.CmdObservation.ID)
+			log.D(ctx, "[ %s ] (%v / %v) Range: %v  Pool: %v  ID: %v\n", status, obsNode.CmdID, liveCmdID, obsNode.CmdObservation.Range, obsNode.CmdObservation.Pool, obsNode.CmdObservation.ID)
 		}
 		return nil
 	})
