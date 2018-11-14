@@ -68,15 +68,15 @@ func (b *asyncFragWatcher) Close() {
 	b.worker.Close()
 }
 
-func (b *asyncFragWatcher) OnReadFrag(ctx context.Context, cmdCtx CmdContext, owner api.RefObject, f api.Fragment, v api.RefObject) {
+func (b *asyncFragWatcher) OnReadFrag(ctx context.Context, cmdCtx CmdContext, owner api.RefObject, f api.Fragment, v api.RefObject, track bool) {
 	b.worker.AddTask(func() {
-		b.fragWatcher.OnReadFrag(ctx, cmdCtx, owner, f, v)
+		b.fragWatcher.OnReadFrag(ctx, cmdCtx, owner, f, v, track)
 	})
 }
 
-func (b *asyncFragWatcher) OnWriteFrag(ctx context.Context, cmdCtx CmdContext, owner api.RefObject, f api.Fragment, old api.RefObject, new api.RefObject) {
+func (b *asyncFragWatcher) OnWriteFrag(ctx context.Context, cmdCtx CmdContext, owner api.RefObject, f api.Fragment, old api.RefObject, new api.RefObject, track bool) {
 	b.worker.AddTask(func() {
-		b.fragWatcher.OnWriteFrag(ctx, cmdCtx, owner, f, old, new)
+		b.fragWatcher.OnWriteFrag(ctx, cmdCtx, owner, f, old, new, track)
 	})
 }
 

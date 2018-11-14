@@ -174,18 +174,18 @@ func (b *dependencyGraphBuilder) OnEndSubCmd(ctx context.Context) {
 	b.subCmdStack = b.subCmdStack[:len(b.subCmdStack)-1]
 }
 
-func (b *dependencyGraphBuilder) OnGet(ctx context.Context, owner api.RefObject, frag api.Fragment, valueRef api.RefObject) {
+func (b *dependencyGraphBuilder) OnReadFrag(ctx context.Context, owner api.RefObject, frag api.Fragment, valueRef api.RefObject, track bool) {
 	cmdCtx := b.cmdCtx()
 	cmdCtx.stats.NumFragReads++
 	b.Stats.NumFragReads++
-	b.fragWatcher.OnReadFrag(ctx, cmdCtx, owner, frag, valueRef)
+	b.fragWatcher.OnReadFrag(ctx, cmdCtx, owner, frag, valueRef, track)
 }
 
-func (b *dependencyGraphBuilder) OnSet(ctx context.Context, owner api.RefObject, frag api.Fragment, oldValueRef api.RefObject, newValueRef api.RefObject) {
+func (b *dependencyGraphBuilder) OnWriteFrag(ctx context.Context, owner api.RefObject, frag api.Fragment, oldValueRef api.RefObject, newValueRef api.RefObject, track bool) {
 	cmdCtx := b.cmdCtx()
 	cmdCtx.stats.NumFragWrites++
 	b.Stats.NumFragWrites++
-	b.fragWatcher.OnWriteFrag(ctx, cmdCtx, owner, frag, oldValueRef, newValueRef)
+	b.fragWatcher.OnWriteFrag(ctx, cmdCtx, owner, frag, oldValueRef, newValueRef, track)
 }
 
 // OnWriteSlice is called when writing to a slice
