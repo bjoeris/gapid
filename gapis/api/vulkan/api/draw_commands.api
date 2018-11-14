@@ -148,6 +148,7 @@ cmd void vkCmdBindVertexBuffers(
 
 
 sub void dovkCmdDraw(ref!vkCmdDrawArgs draw) {
+  readDrawState()
   useRenderPass()
 
   readWriteMemoryInBoundGraphicsDescriptorSets()
@@ -189,6 +190,7 @@ vkCmdDrawIndexedArgs {
 }
 
 sub void dovkCmdDrawIndexed(ref!vkCmdDrawIndexedArgs draw) {
+  readDrawState()
   useRenderPass()
 
   // Loop through the index buffer, and find the low and high
@@ -252,6 +254,7 @@ cmd void vkCmdDrawIndexed(
 }
 
 sub void dovkCmdDrawIndirect(ref!vkCmdDrawIndirectArgs draw) {
+  readDrawState()
   useRenderPass()
 
   if draw.DrawCount > 0 {
@@ -298,6 +301,7 @@ cmd void vkCmdDrawIndirect(
 }
 
 sub void dovkCmdDrawIndexedIndirect(ref!vkCmdDrawIndexedIndirectArgs draw) {
+  readDrawState()
   useRenderPass()
 
   if draw.DrawCount > 0 {
@@ -418,4 +422,97 @@ sub void readWriteMemoryInBoundComputeDescriptorSets() {
     lastComputeInfo().ComputePipeline.PipelineLayout,
     lastComputeInfo().DescriptorSets,
     lastComputeInfo().BufferBindingOffsets)
+}
+
+@internal class DynamicStateSet {
+  bool[9] contains
+}
+
+sub  ref!DynamicStateSet unpackDynamicState(ref!DynamicData data) {
+  obj := new!DynamicStateSet()
+  for _, _, s in data.DynamicStates {
+    if as!s32(s) < 9 {
+      obj.contains[as!s32(s)] = true
+    }
+  }
+  return obj
+}
+
+sub void readDrawState() {
+  info := lastDrawInfo()
+  pipeline := info.GraphicsPipeline
+
+  dynamicState := unpackDynamicState(pipeline.DynamicState)
+  dyn := lastDynamicPipelineState()
+  
+  // read all viewports
+  if dynamicState.contains[as!u32(VK_DYNAMIC_STATE_VIEWPORT)] {
+    _ = len(dyn.Viewports)
+  } else {
+    _ = len(pipeline.ViewportState.Viewports)
+  }
+
+  // read all scissors
+  if dynamicState.contains[as!u32(VK_DYNAMIC_STATE_SCISSOR)] {
+    _ = len(dyn.Scissors)
+  } else {
+    _ = len(pipeline.ViewportState.Scissors)
+  }
+
+  // read line width
+  if dynamicState.contains[as!u32(VK_DYNAMIC_STATE_LINE_WIDTH)] {
+    _ = dyn.LineWidth
+  } else {
+    _ = pipeline.RasterizationState.LineWidth
+  }
+
+  // read depth bias
+  if dynamicState.contains[as!u32(VK_DYNAMIC_STATE_DEPTH_BIAS)] {
+    _ = dyn.DepthBiasConstantFactor
+    _ = dyn.DepthBiasClamp
+    _ = dyn.DepthBiasSlopeFactor
+  } else {
+    _ = pipeline.RasterizationState.DepthBiasConstantFactor
+    _ = pipeline.RasterizationState.DepthBiasClamp
+    _ = pipeline.RasterizationState.DepthBiasSlopeFactor
+  }
+
+  // read blend constants
+  if dynamicState.contains[as!u32(VK_DYNAMIC_STATE_BLEND_CONSTANTS)] {
+    _ = dyn.BlendConstants[0]
+    _ = dyn.BlendConstants[1]
+    _ = dyn.BlendConstants[2]
+    _ = dyn.BlendConstants[3]
+  } else {
+    _ = pipeline.ColorBlendState.BlendConstants[0]
+    _ = pipeline.ColorBlendState.BlendConstants[1]
+    _ = pipeline.ColorBlendState.BlendConstants[2]
+    _ = pipeline.ColorBlendState.BlendConstants[3]
+  }
+
+  // read depth bounds
+  if dynamicState.contains[as!u32(VK_DYNAMIC_STATE_BLEND_CONSTANTS)] {
+    _ = dyn.MinDepthBounds
+    _ = dyn.MaxDepthBounds
+  } else {
+    _ = pipeline.DepthState.MinDepthBounds
+    _ = pipeline.DepthState.MaxDepthBounds
+  }
+
+  // read stencil state
+  if dynamicState.contains[as!u32(VK_DYNAMIC_STATE_BLEND_CONSTANTS)] {
+    _ = dyn.StencilFront.compareMask
+    _ = dyn.StencilFront.writeMask
+    _ = dyn.StencilFront.reference
+    _ = dyn.StencilBack.compareMask
+    _ = dyn.StencilBack.writeMask
+    _ = dyn.StencilBack.reference
+  } else {
+    _ = pipeline.DepthState.Front.compareMask
+    _ = pipeline.DepthState.Front.writeMask
+    _ = pipeline.DepthState.Front.reference
+    _ = pipeline.DepthState.Back.compareMask
+    _ = pipeline.DepthState.Back.writeMask
+    _ = pipeline.DepthState.Back.reference
+  }
 }
