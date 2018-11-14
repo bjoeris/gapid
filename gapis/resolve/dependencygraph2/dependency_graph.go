@@ -46,6 +46,14 @@ type ObsNode struct {
 
 func (ObsNode) dependencyNode() {}
 
+type NodeAccesses struct {
+	FragmentAccesses []FragmentAccess
+	MemoryAccesses   []MemoryAccess
+	ForwardAccesses  []ForwardAccess
+	ParentNode       NodeID
+	InitCmdNodes     []NodeID
+}
+
 // Information about what sort of data to store in a dependency graph
 type DependencyGraphConfig struct {
 	// MergeSubCmdNodes indicates whether the graph should have one node per
@@ -58,6 +66,8 @@ type DependencyGraphConfig struct {
 
 	// ReverseDependencies indicates whether reverse edges should be created
 	ReverseDependencies bool
+
+	SaveNodeAccesses bool
 }
 
 // NodeID identifies a node in a dependency graph
@@ -123,6 +133,8 @@ type DependencyGraph interface {
 	// first command in the capture)
 	NumInitialCommands() int
 
+	GetNodeAccesses(NodeID) NodeAccesses
+
 	// Config returns the config used to create this graph
 	Config() DependencyGraphConfig
 }
@@ -133,13 +145,14 @@ type obsNodeIDs struct {
 }
 
 type dependencyGraph struct {
-	capture    *capture.Capture
-	cmdNodeIDs *api.SubCmdIdxTrie
+	capture          *capture.Capture
+	cmdNodeIDs       *api.SubCmdIdxTrie
 	initialCommands  []api.Cmd
 	nodes            []Node
 	numDependencies  uint64
 	dependenciesFrom [][]NodeID
 	dependenciesTo   [][]NodeID
+	nodeAccesses     []NodeAccesses
 
 	config DependencyGraphConfig
 }
@@ -288,6 +301,16 @@ func (g *dependencyGraph) NumInitialCommands() int {
 	return len(g.initialCommands)
 }
 
+func (g *dependencyGraph) GetNodeAccesses(nodeID NodeID) NodeAccesses {
+	if nodeID < NodeID(len(g.nodeAccesses)) {
+		return g.nodeAccesses[nodeID]
+	} else {
+		return NodeAccesses{
+			ParentNode: NodeNoID,
+		}
+	}
+}
+
 // Config returns the config used to create this graph
 func (g *dependencyGraph) Config() DependencyGraphConfig {
 	return g.config
@@ -297,10 +320,19 @@ func (g *dependencyGraph) addNode(node Node) NodeID {
 	nodeID := (NodeID)(len(g.nodes))
 	g.nodes = append(g.nodes, node)
 	g.dependenciesFrom = append(g.dependenciesFrom, []NodeID{})
+	if g.config.SaveNodeAccesses {
+		g.nodeAccesses = append(g.nodeAccesses, NodeAccesses{})
+	}
 	if cmdNode, ok := node.(CmdNode); ok {
 		g.cmdNodeIDs.SetValue(cmdNode.Index, nodeID)
 	}
 	return nodeID
+}
+
+func (g *dependencyGraph) setNodeAccesses(nodeID NodeID, acc NodeAccesses) {
+	if nodeID < NodeID(len(g.nodeAccesses)) {
+		g.nodeAccesses[nodeID] = acc
+	}
 }
 
 func (g *dependencyGraph) setDependencies(src NodeID, targets []NodeID) {
