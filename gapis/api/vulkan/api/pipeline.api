@@ -687,6 +687,10 @@ cmd void vkCmdBindPipeline(
 }
 
 sub void dovkCmdSetViewport(ref!vkCmdSetViewportArgs args) {
+      viewportCount := len(args.Viewports)
+      for i in (0 .. viewportCount) {
+        lastDrawInfo().DynamicViewports[args.FirstViewport + as!u32(i)] = args.Viewports[as!u32(i)]
+      }
 }
 
 @threadSafety("app")
@@ -720,6 +724,10 @@ cmd void vkCmdSetViewport(
 }
 
 sub void dovkCmdSetScissor(ref!vkCmdSetScissorArgs args) {
+      scissorCount := len(args.Scissors)
+      for i in (0 .. scissorCount) {
+        lastDrawInfo().DynamicScissors[args.FirstScissor + as!u32(i)] = args.Scissors[as!u32(i)]
+      }
 }
 
 @threadSafety("app")
@@ -752,6 +760,7 @@ cmd void vkCmdSetScissor(
 }
 
 sub void dovkCmdSetLineWidth(ref!vkCmdSetLineWidthArgs args) {
+  lastDrawInfo().DynamicLineWidth = args.LineWidth
 }
 
 @threadSafety("app")
@@ -777,6 +786,10 @@ cmd void vkCmdSetLineWidth(
 }
 
 sub void dovkCmdSetDepthBias(ref!vkCmdSetDepthBiasArgs args) {
+  info := lastDrawInfo()
+  info.DynamicDepthBiasConstantFactor = args.DepthBiasConstantFactor
+  info.DynamicDepthBiasClamp = args.DepthBiasClamp
+  info.DynamicDepthBiasSlopeFactor = args.DepthBiasSlopeFactor
 }
 
 @threadSafety("app")
@@ -809,6 +822,11 @@ cmd void vkCmdSetDepthBias(
 }
 
 sub void dovkCmdSetBlendConstants(ref!vkCmdSetBlendConstantsArgs args) {
+  info := lastDrawInfo()
+  info.DynamicBlendConstants[0] = args.R
+  info.DynamicBlendConstants[1] = args.G
+  info.DynamicBlendConstants[2] = args.B
+  info.DynamicBlendConstants[3] = args.A
 }
 
 @threadSafety("app")
@@ -837,6 +855,9 @@ cmd void vkCmdSetBlendConstants(
 }
 
 sub void dovkCmdSetDepthBounds(ref!vkCmdSetDepthBoundsArgs args) {
+  info := lastDrawInfo()
+  info.DynamicMinDepthBounds = args.MinDepthBounds
+  info.DynamicMaxDepthBounds = args.MaxDepthBounds
 }
 
 @threadSafety("app")
@@ -864,6 +885,13 @@ cmd void vkCmdSetDepthBounds(
 }
 
 sub void dovkCmdSetStencilCompareMask(ref!vkCmdSetStencilCompareMaskArgs args) {
+  info := lastDrawInfo()
+  if (as!u32(args.FaceMask) & as!u32(VK_STENCIL_FACE_FRONT_BIT)) != as!u32(0) {
+    info.DynamicStencilFront.compareMask = args.CompareMask
+  }
+  if (as!u32(args.FaceMask) & as!u32(VK_STENCIL_FACE_BACK_BIT)) != as!u32(0) {
+    info.DynamicStencilBack.compareMask = args.CompareMask
+  }
 }
 
 @threadSafety("app")
@@ -892,6 +920,13 @@ cmd void vkCmdSetStencilCompareMask(
 }
 
 sub void dovkCmdSetStencilWriteMask(ref!vkCmdSetStencilWriteMaskArgs args) {
+  info := lastDrawInfo()
+  if (as!u32(args.FaceMask) & as!u32(VK_STENCIL_FACE_FRONT_BIT)) != as!u32(0) {
+    info.DynamicStencilFront.writeMask = args.WriteMask
+  }
+  if (as!u32(args.FaceMask) & as!u32(VK_STENCIL_FACE_BACK_BIT)) != as!u32(0) {
+    info.DynamicStencilBack.writeMask = args.WriteMask
+  }
 }
 
 @threadSafety("app")
@@ -920,6 +955,13 @@ cmd void vkCmdSetStencilWriteMask(
 }
 
 sub void dovkCmdSetStencilReference(ref!vkCmdSetStencilReferenceArgs args) {
+  info := lastDrawInfo()
+  if (as!u32(args.FaceMask) & as!u32(VK_STENCIL_FACE_FRONT_BIT)) != as!u32(0) {
+    info.DynamicStencilFront.reference = args.Reference
+  }
+  if (as!u32(args.FaceMask) & as!u32(VK_STENCIL_FACE_BACK_BIT)) != as!u32(0) {
+    info.DynamicStencilBack.reference = args.Reference
+  }
 }
 
 @threadSafety("app")

@@ -244,6 +244,28 @@ sub ref!ExtensionSet supportedDeviceExtensions() {
   // BufferBindingOffsets[setNum][bindingNum][bufferBindingNum] :=
   //    buffer offset for given descriptor set number, binding number, and index of buffer binding
   map!(u32, map!(u32, map!(u32, VkDeviceSize))) BufferBindingOffsets
+  // The viewports set by vkCmdSetViewport
+  map!(u32, VkViewport) DynamicViewports
+  // The Scissors set by vkCmdSetScissor
+  map!(u32, VkRect2D) DynamicScissors
+  // The value set by vkCmdSetLineWidth
+  f32 DynamicLineWidth
+  // The constant factor set by vkCmdSetDepthBias
+  f32 DynamicDepthBiasConstantFactor
+  // The clamp set by vkCmdSetDepthBias
+  f32 DynamicDepthBiasClamp
+  // The slope factor set by vkCmdSetDepthBias
+  f32 DynamicDepthBiasSlopeFactor
+  // The blend constants set by vkCmdSetBlendConstants
+  f32[4] DynamicBlendConstants
+  // The min depth bounds set by vkCmdSetDepthBounds
+  f32 DynamicMinDepthBounds
+  // The max depth bounds set by vkCmdSetDepthBounds
+  f32 DynamicMaxDepthBounds
+  // The front stencil state set by vkCmdSetStencil*
+  VkStencilOpState DynamicStencilFront
+  // The back stencil state set by vkCmdSetStencil*
+  VkStencilOpState DynamicStencilBack
 }
 
 @internal class ComputeInfo {
