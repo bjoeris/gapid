@@ -1,0 +1,103 @@
+syntax = "proto3";
+
+package dependencygraph2;
+
+option go_package = "github.com/google/gapid/gapis/resolve/dependencygraph2/dependencygraph2_pb";
+
+import "gapis/memory/memory_pb/memory.proto";
+
+message DependencyGraph {
+  repeated Node nodes = 1;
+  map<uint64, RefFrag> stateRefs = 2;
+}
+
+message Node {
+  uint64 nodeID = 1;
+  oneof type {
+    CmdNode cmdNode = 2;
+    ObsNode obsNode = 3;
+  }
+  repeated FragmentAccess fragmentAccesses = 4;
+  repeated MemoryAccess memoryAccesses = 5;
+  repeated ForwardAccess forwardAccesses = 6;
+  uint64 parentNode = 7;
+  repeated uint64 initCmdNodes = 8;
+  repeated uint64 dependencies = 9;
+  repeated uint64 reverseDependencies = 10;
+}
+
+message CmdNode {
+  repeated uint64 indices = 1;
+  // uint64 initCmdID = 2;
+}
+
+message ObsNode {
+  memory.Observation observation = 1;
+  uint64 cmdID = 2;
+  bool isWrite = 3;
+  uint64 index = 4;
+}
+
+message FragmentAccess {
+  uint64 nodeID = 1;
+  uint64 refID = 2;
+  Fragment fragment = 3;
+  AccessMode mode = 4;
+  repeated uint64 dependencies = 5;
+}
+
+message MemoryAccess {
+  uint64 nodeID = 1;
+  uint64 poolID = 2;
+  uint64 start = 3;
+  uint64 end = 4;
+  AccessMode mode = 5;
+  repeated uint64 dependencies=6;
+}
+
+message ForwardAccess {
+  uint64 open = 1;
+  uint64 close = 2;
+  uint64 drop = 3;
+  string dependencyID = 4;
+  ForwardAccessMode mode = 5;
+}
+
+message Fragment {
+  oneof type {
+    FieldFragment field = 1;
+    uint64 arrayIndex = 2;
+    MapIndexFragment mapIndex = 3;
+    CompleteFragment complete = 4;
+  }
+}
+message FieldFragment {
+  string name = 1;
+  string class = 2;
+  uint32 index = 3;
+}
+message MapIndexFragment {
+  oneof type {
+    uint64 uint64Index = 1;
+    string stringIndex = 2;
+  }
+}
+message CompleteFragment{}
+
+enum AccessMode {
+  _ = 0;
+	ACCESS_READ       = 1;
+	ACCESS_WRITE      = 2;
+	ACCESS_READ_WRITE = 3;
+}
+
+enum ForwardAccessMode {
+  FORWARD_OPEN = 0;
+  FORWARD_CLOSE = 1;
+  FORWARD_DROP = 2;
+}
+
+message RefFrag {
+  uint64 refID = 1;
+  Fragment frag = 2;
+}
