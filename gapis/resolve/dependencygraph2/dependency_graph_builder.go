@@ -359,6 +359,8 @@ func BuildDependencyGraph(ctx context.Context, config DependencyGraphConfig,
 
 	b.LogStats(ctx, false)
 
+	graph.setStateRefs(b.fragWatcher.GetStateRefs())
+
 	return graph, nil
 }
 
