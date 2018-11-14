@@ -18,8 +18,8 @@ import (
 	"context"
 
 	"github.com/google/gapid/gapis/api"
+	"github.com/google/gapid/gapis/api/sync"
 	"github.com/google/gapid/gapis/capture"
-
 	"github.com/google/gapid/gapis/memory"
 )
 
@@ -54,8 +54,8 @@ func NewAsyncForwardWatcher(bufSize int, batchSize int) *asyncForwardWatcher {
 }
 
 func NewAsyncGraphBuilder(ctx context.Context, config DependencyGraphConfig,
-	c *capture.Capture, initialCmds []api.Cmd, bufSize int) *asyncGraphBuilder {
-	return &asyncGraphBuilder{*NewGraphBuilder(ctx, config, c, initialCmds),
+	c *capture.Capture, initialCmds []api.Cmd, syncData *sync.Data, bufSize int) *asyncGraphBuilder {
+	return &asyncGraphBuilder{*NewGraphBuilder(ctx, config, c, initialCmds, syncData),
 		newSimpleWorker(bufSize)}
 }
 
@@ -94,9 +94,9 @@ func (b *asyncFragWatcher) OnEndCmd(ctx context.Context, cmdCtx CmdContext) map[
 	b.worker.Flush()
 	return <-c
 }
-func (b *asyncFragWatcher) OnBeginSubCmd(ctx context.Context, cmdCtx CmdContext) {
+func (b *asyncFragWatcher) OnBeginSubCmd(ctx context.Context, cmdCtx CmdContext, subCmdCtx CmdContext) {
 	b.worker.AddTask(func() {
-		b.fragWatcher.OnBeginSubCmd(ctx, cmdCtx)
+		b.fragWatcher.OnBeginSubCmd(ctx, cmdCtx, subCmdCtx)
 	})
 }
 func (b *asyncFragWatcher) OnEndSubCmd(ctx context.Context, cmdCtx CmdContext) {
@@ -152,9 +152,9 @@ func (b *asyncMemWatcher) OnEndCmd(ctx context.Context, cmdCtx CmdContext) map[N
 	b.worker.Flush()
 	return <-c
 }
-func (b *asyncMemWatcher) OnBeginSubCmd(ctx context.Context, cmdCtx CmdContext) {
+func (b *asyncMemWatcher) OnBeginSubCmd(ctx context.Context, cmdCtx CmdContext, subCmdCtx CmdContext) {
 	b.worker.AddTask(func() {
-		b.memWatcher.OnBeginSubCmd(ctx, cmdCtx)
+		b.memWatcher.OnBeginSubCmd(ctx, cmdCtx, subCmdCtx)
 	})
 }
 func (b *asyncMemWatcher) OnEndSubCmd(ctx context.Context, cmdCtx CmdContext) {
@@ -202,9 +202,9 @@ func (b *asyncForwardWatcher) OnEndCmd(ctx context.Context, cmdCtx CmdContext) m
 	b.worker.Flush()
 	return <-c
 }
-func (b *asyncForwardWatcher) OnBeginSubCmd(ctx context.Context, cmdCtx CmdContext) {
+func (b *asyncForwardWatcher) OnBeginSubCmd(ctx context.Context, cmdCtx CmdContext, subCmdCtx CmdContext) {
 	b.worker.AddTask(func() {
-		b.forwardWatcher.OnBeginSubCmd(ctx, cmdCtx)
+		b.forwardWatcher.OnBeginSubCmd(ctx, cmdCtx, subCmdCtx)
 	})
 }
 func (b *asyncForwardWatcher) OnEndSubCmd(ctx context.Context, cmdCtx CmdContext) {
@@ -219,21 +219,13 @@ type asyncGraphBuilder struct {
 }
 
 func (b *asyncGraphBuilder) AddDependencies(
+	ctx context.Context,
 	fragAcc map[NodeID][]FragmentAccess,
 	memAcc map[NodeID][]MemoryAccess,
 	forwardAcc map[NodeID][]ForwardAccess) {
 
 	b.worker.AddTask(func() {
-		b.graphBuilder.AddDependencies(fragAcc, memAcc, forwardAcc)
-	})
-}
-
-func (b *asyncGraphBuilder) AddNodeDependencies(nodeID NodeID,
-	fragAccesses []FragmentAccess,
-	memAccesses []MemoryAccess,
-	forwardAccesses []ForwardAccess) {
-	b.worker.AddTask(func() {
-		b.graphBuilder.AddNodeDependencies(nodeID, fragAccesses, memAccesses, forwardAccesses)
+		b.graphBuilder.AddDependencies(ctx, fragAcc, memAcc, forwardAcc)
 	})
 }
 
@@ -261,10 +253,19 @@ func (b *asyncGraphBuilder) GetObsNodeIDs(cmdID api.CmdID, obs []api.CmdObservat
 	return <-c
 }
 
-func (b *asyncGraphBuilder) GetCmdContext(cmdID api.CmdID, cmd api.Cmd, idx api.SubCmdIdx, depth int) CmdContext {
+func (b *asyncGraphBuilder) GetCmdContext(cmdID api.CmdID, cmd api.Cmd) CmdContext {
 	c := make(chan CmdContext)
 	b.worker.AddTask(func() {
-		c <- b.graphBuilder.GetCmdContext(cmdID, cmd, idx, depth)
+		c <- b.graphBuilder.GetCmdContext(cmdID, cmd)
+	})
+	b.worker.Flush()
+	return <-c
+}
+
+func (b *asyncGraphBuilder) GetSubCmdContext(idx api.SubCmdIdx, parent CmdContext) CmdContext {
+	c := make(chan CmdContext)
+	b.worker.AddTask(func() {
+		c <- b.graphBuilder.GetSubCmdContext(idx, parent)
 	})
 	b.worker.Flush()
 	return <-c

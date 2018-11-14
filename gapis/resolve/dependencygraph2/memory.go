@@ -40,7 +40,7 @@ type MemWatcher interface {
 	OnReadObs(ctx context.Context, cmdCtx CmdContext, obs []api.CmdObservation, nodes []NodeID)
 	OnBeginCmd(ctx context.Context, cmdCtx CmdContext)
 	OnEndCmd(ctx context.Context, cmdCtx CmdContext) map[NodeID][]MemoryAccess
-	OnBeginSubCmd(ctx context.Context, cmdCtx CmdContext)
+	OnBeginSubCmd(ctx context.Context, cmdCtx CmdContext, subCmdCtx CmdContext)
 	OnEndSubCmd(ctx context.Context, cmdCtx CmdContext)
 	Close()
 }
@@ -165,7 +165,7 @@ func (b *memWatcher) OnEndCmd(ctx context.Context, cmdCtx CmdContext) map[NodeID
 	return acc
 }
 
-func (b *memWatcher) OnBeginSubCmd(ctx context.Context, cmdCtx CmdContext) {
+func (b *memWatcher) OnBeginSubCmd(ctx context.Context, cmdCtx CmdContext, subCmdCtx CmdContext) {
 	b.Flush(ctx, cmdCtx)
 }
 

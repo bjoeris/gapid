@@ -24,6 +24,7 @@ import (
 	"github.com/google/gapid/core/log"
 	"github.com/google/gapid/core/math/interval"
 	"github.com/google/gapid/gapis/api"
+	"github.com/google/gapid/gapis/api/sync"
 	"github.com/google/gapid/gapis/capture"
 	"github.com/google/gapid/gapis/config"
 	"github.com/google/gapid/gapis/memory"
@@ -89,7 +90,7 @@ type dependencyGraphBuilder struct {
 
 // Build a new dependencyGraphBuilder.
 func newDependencyGraphBuilder(ctx context.Context, config DependencyGraphConfig,
-	c *capture.Capture, initialCmds []api.Cmd) *dependencyGraphBuilder {
+	c *capture.Capture, initialCmds []api.Cmd, syncData *sync.Data) *dependencyGraphBuilder {
 	builder := &dependencyGraphBuilder{}
 	builder.capture = c
 	builder.config = config
@@ -100,12 +101,12 @@ func newDependencyGraphBuilder(ctx context.Context, config DependencyGraphConfig
 		builder.fragWatcher = NewAsyncFragWatcher(bufSize, batchSize)
 		builder.memWatcher = NewAsyncMemWatcher(bufSize, batchSize)
 		builder.forwardWatcher = NewAsyncForwardWatcher(bufSize, batchSize)
-		builder.graphBuilder = NewAsyncGraphBuilder(ctx, config, c, initialCmds, bufSize)
+		builder.graphBuilder = NewAsyncGraphBuilder(ctx, config, c, initialCmds, syncData, bufSize)
 	} else {
 		builder.fragWatcher = NewFragWatcher()
 		builder.memWatcher = NewMemWatcher()
 		builder.forwardWatcher = NewForwardWatcher()
-		builder.graphBuilder = NewGraphBuilder(ctx, config, c, initialCmds)
+		builder.graphBuilder = NewGraphBuilder(ctx, config, c, initialCmds, syncData)
 	}
 
 	return builder
@@ -117,8 +118,8 @@ func (b *dependencyGraphBuilder) OnBeginCmd(ctx context.Context, cmdID api.CmdID
 		log.E(ctx, "OnBeginCmd called while processing another command")
 		b.subCmdStack = b.subCmdStack[:0]
 	}
-	idx := api.SubCmdIdx{}
-	cmdCtx := b.graphBuilder.GetCmdContext(cmdID, cmd, idx, 0)
+	cmdCtx := b.graphBuilder.GetCmdContext(cmdID, cmd)
+	b.graphBuilder.OnBeginCmd(ctx, cmdCtx)
 	b.fragWatcher.OnBeginCmd(ctx, cmdCtx)
 	b.memWatcher.OnBeginCmd(ctx, cmdCtx)
 	b.forwardWatcher.OnBeginCmd(ctx, cmdCtx)
@@ -136,26 +137,32 @@ func (b *dependencyGraphBuilder) OnEndCmd(ctx context.Context, cmdID api.CmdID, 
 	memAcc := b.memWatcher.OnEndCmd(ctx, cmdCtx)
 	forwardAcc := b.forwardWatcher.OnEndCmd(ctx, cmdCtx)
 
-	b.graphBuilder.AddDependencies(fragAcc, memAcc, forwardAcc)
+	b.graphBuilder.AddDependencies(ctx, fragAcc, memAcc, forwardAcc)
 
 	b.subCmdStack = b.subCmdStack[:0]
 }
 
 func (b *dependencyGraphBuilder) OnBeginSubCmd(ctx context.Context, subCmdIdx api.SubCmdIdx) {
-	if b.config.MergeSubCmdNodes {
-		return
-	}
 	if len(b.subCmdStack) == 0 {
 		log.E(ctx, "OnBeginSubCmd called while not processing any command")
 	}
-	oldCmdCtx := b.cmdCtx()
-	newCmdCtx := b.graphBuilder.GetCmdContext(oldCmdCtx.cmdID, oldCmdCtx.cmd, subCmdIdx, oldCmdCtx.depth+1)
 
-	b.fragWatcher.OnBeginSubCmd(ctx, newCmdCtx)
-	b.memWatcher.OnBeginSubCmd(ctx, newCmdCtx)
-	b.forwardWatcher.OnBeginSubCmd(ctx, newCmdCtx)
+	cmdCtx := b.cmdCtx()
+	if b.config.MergeSubCmdNodes {
+		subCmdCtx := cmdCtx
+		subCmdCtx.subCmdIdx = subCmdIdx
+		b.graphBuilder.OnBeginSubCmd(ctx, cmdCtx, subCmdCtx)
+		return
+	}
 
-	b.subCmdStack = append(b.subCmdStack, newCmdCtx)
+	subCmdCtx := b.graphBuilder.GetSubCmdContext(subCmdIdx, cmdCtx)
+
+	b.graphBuilder.OnBeginSubCmd(ctx, cmdCtx, subCmdCtx)
+	b.fragWatcher.OnBeginSubCmd(ctx, cmdCtx, subCmdCtx)
+	b.memWatcher.OnBeginSubCmd(ctx, cmdCtx, subCmdCtx)
+	b.forwardWatcher.OnBeginSubCmd(ctx, cmdCtx, subCmdCtx)
+
+	b.subCmdStack = append(b.subCmdStack, subCmdCtx)
 }
 
 func (b *dependencyGraphBuilder) OnEndSubCmd(ctx context.Context) {
@@ -330,10 +337,10 @@ func (b *dependencyGraphBuilder) LogStats(ctx context.Context, full bool) {
 }
 
 func BuildDependencyGraph(ctx context.Context, config DependencyGraphConfig,
-	c *capture.Capture, initialCmds []api.Cmd, initialRanges interval.U64RangeList) (DependencyGraph, error) {
+	c *capture.Capture, initialCmds []api.Cmd, initialRanges interval.U64RangeList, syncData *sync.Data) (DependencyGraph, error) {
 	ctx = status.Start(ctx, "BuildDependencyGraph")
 	defer status.Finish(ctx)
-	b := newDependencyGraphBuilder(ctx, config, c, initialCmds)
+	b := newDependencyGraphBuilder(ctx, config, c, initialCmds, syncData)
 	var state *api.GlobalState
 	if config.IncludeInitialCommands {
 		state = c.NewUninitializedState(ctx).ReserveMemory(initialRanges)
@@ -404,10 +411,11 @@ func (d Distribution) Add(x uint64) {
 }
 
 type CmdContext struct {
-	cmdID     api.CmdID
-	cmd       api.Cmd
-	subCmdIdx api.SubCmdIdx
-	nodeID    NodeID
-	depth     int
-	stats     *NodeStats
+	cmdID        api.CmdID
+	cmd          api.Cmd
+	subCmdIdx    api.SubCmdIdx
+	nodeID       NodeID
+	depth        int
+	parentNodeID NodeID
+	stats        *NodeStats
 }

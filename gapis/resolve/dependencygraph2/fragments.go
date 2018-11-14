@@ -36,7 +36,7 @@ type FragWatcher interface {
 	OnWriteFrag(ctx context.Context, cmdCtx CmdContext, owner api.RefObject, f api.Fragment, old api.RefObject, new api.RefObject, track bool)
 	OnBeginCmd(ctx context.Context, cmdCtx CmdContext)
 	OnEndCmd(ctx context.Context, cmdCtx CmdContext) map[NodeID][]FragmentAccess
-	OnBeginSubCmd(ctx context.Context, cmdCtx CmdContext)
+	OnBeginSubCmd(ctx context.Context, cmdCtx CmdContext, subCmdCtx CmdContext)
 	OnEndSubCmd(ctx context.Context, cmdCtx CmdContext)
 	Close()
 }
@@ -250,7 +250,7 @@ func (b *fragWatcher) Flush(ctx context.Context, cmdCtx CmdContext) {
 	// Ensure that fragAccesses has sufficient capacity
 	if fragAccessesCap > cap(fragAccesses) {
 		// round up to next power of 2
-		fragAccessesCap = 1 << uint(bits.Len(uint(fragAccessesCap))+1)
+		fragAccessesCap = 1 << uint(bits.Len(uint(fragAccessesCap)))
 
 		newFragAccesses := make([]FragmentAccess, len(fragAccesses), fragAccessesCap)
 		copy(newFragAccesses, fragAccesses)
@@ -379,7 +379,7 @@ func (b *fragWatcher) OnEndCmd(ctx context.Context, cmdCtx CmdContext) map[NodeI
 	return acc
 }
 
-func (b *fragWatcher) OnBeginSubCmd(ctx context.Context, cmdCtx CmdContext) {
+func (b *fragWatcher) OnBeginSubCmd(ctx context.Context, cmdCtx CmdContext, subCmdCtx CmdContext) {
 	b.Flush(ctx, cmdCtx)
 }
 
