@@ -382,35 +382,3 @@ func (g *dependencyGraph) buildDependenciesTo() {
 	}
 }
 
-func countObservations(cmds []api.Cmd) int {
-	numObservations := 0
-	for _, cmd := range cmds {
-		observations := cmd.Extras().Observations()
-		if observations != nil {
-			numObservations += len(observations.Reads)
-			numObservations += len(observations.Writes)
-		}
-	}
-	return numObservations
-}
-
-func (g *dependencyGraph) addCmdNodes(cmdID api.CmdID, observations *api.CmdObservations) obsNodeIDs {
-	obsNodeIDs := obsNodeIDs{readNodeIDStart: NodeID(len(g.nodes))}
-	if observations != nil {
-		for i, obs := range observations.Reads {
-			g.nodes = append(g.nodes, ObsNode{obs, cmdID, false, i})
-		}
-	}
-	if cmdID != api.CmdNoID {
-		subCmdIdx := api.SubCmdIdx{uint64(cmdID)}
-		g.cmdNodeIDs.SetValue(subCmdIdx, NodeID(len(g.nodes)))
-		g.nodes = append(g.nodes, CmdNode{subCmdIdx})
-	}
-	obsNodeIDs.writeNodeIDStart = NodeID(len(g.nodes))
-	if observations != nil {
-		for i, obs := range observations.Writes {
-			g.nodes = append(g.nodes, ObsNode{obs, cmdID, true, i})
-		}
-	}
-	return obsNodeIDs
-}
