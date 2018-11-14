@@ -881,6 +881,9 @@ vkCmdPushConstantsArgs {
 }
 
 sub void dovkCmdPushConstants(ref!vkCmdPushConstantsArgs args) {
+  _ = PipelineLayouts[args.Layout]
+  pushConstants := lastPushConstants()
+  write(pushConstants.Data[args.Offset:args.Offset+args.Size])
 }
 
 @indirect("VkCommandBuffer", "VkDevice")
@@ -904,6 +907,14 @@ cmd void vkCmdPushConstants(
     args
 
     AddCommand(commandBuffer, cmd_vkCmdPushConstants, mapPos)
+  }
+}
+
+sub void readPushConstants(VkPipelineBindPoint bindPoint) {
+  layout := boundPipelineLayout(bindPoint)
+  pushConstants := lastPushConstants()
+  for _, _, r in layout.PushConstantRanges {
+    read(pushConstants.Data[r.offset:r.offset+r.size])
   }
 }
 
