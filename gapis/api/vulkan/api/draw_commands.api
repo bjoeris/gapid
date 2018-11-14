@@ -489,4 +489,6 @@ sub void readDrawState() {
     _ = pipeline.DepthState.Back.writeMask
     _ = pipeline.DepthState.Back.reference
   }
+
+  readPushConstants(VK_PIPELINE_BIND_POINT_GRAPHICS)
 }
