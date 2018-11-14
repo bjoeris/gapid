@@ -89,24 +89,27 @@ type dependencyGraphBuilder struct {
 }
 
 // Build a new dependencyGraphBuilder.
-func newDependencyGraphBuilder(ctx context.Context, config DependencyGraphConfig,
+func newDependencyGraphBuilder(ctx context.Context, cfg DependencyGraphConfig,
 	c *capture.Capture, initialCmds []api.Cmd, syncData *sync.Data) *dependencyGraphBuilder {
 	builder := &dependencyGraphBuilder{}
 	builder.capture = c
-	builder.config = config
+	builder.config = cfg
 
 	bufSize := 1024
 	batchSize := 128
+	if !config.MultithreadingDependencyGraphBuilder {
+		bufSize = -1
+	}
 	if bufSize >= 0 {
 		builder.fragWatcher = NewAsyncFragWatcher(bufSize, batchSize)
 		builder.memWatcher = NewAsyncMemWatcher(bufSize, batchSize)
 		builder.forwardWatcher = NewAsyncForwardWatcher(bufSize, batchSize)
-		builder.graphBuilder = NewAsyncGraphBuilder(ctx, config, c, initialCmds, syncData, bufSize)
+		builder.graphBuilder = NewAsyncGraphBuilder(ctx, cfg, c, initialCmds, syncData, bufSize)
 	} else {
 		builder.fragWatcher = NewFragWatcher()
 		builder.memWatcher = NewMemWatcher()
 		builder.forwardWatcher = NewForwardWatcher()
-		builder.graphBuilder = NewGraphBuilder(ctx, config, c, initialCmds, syncData)
+		builder.graphBuilder = NewGraphBuilder(ctx, cfg, c, initialCmds, syncData)
 	}
 
 	return builder
