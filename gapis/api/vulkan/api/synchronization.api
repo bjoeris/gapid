@@ -395,12 +395,7 @@ sub void dovkCmdWaitEvents(ref!vkCmdWaitEventsArgs args) {
     }
   }
   if len(LastBoundQueue.PendingEvents) == 0 {
-    for _ , _ , b in args.ImageMemoryBarriers {
-      if !(b.image in Images) { vkErrorInvalidImage(b.image) } else {
-        image := Images[b.image]
-      transitionImageLayout(image, b.subresourceRange, b.oldLayout, b.newLayout)
-      }
-    }
+    processBarriers(args.SrcStageMask, args.DstStageMask, args.MemoryBarriers, args.BufferMemoryBarriers, args.ImageMemoryBarriers)
   }
 }
 
@@ -468,16 +463,9 @@ cmd void vkCmdWaitEvents(
 }
 
 sub void dovkCmdPipelineBarrier(ref!vkCmdPipelineBarrierArgs args) {
-  for _ , _ , v in args.ImageMemoryBarriers {
-    if !(v.image in Images) { vkErrorInvalidImage(v.image) } else {
-      image := Images[v.image]
-      transitionImageLayout(image, v.subresourceRange, v.oldLayout, v.newLayout)
-      if v.oldLayout == VK_IMAGE_LAYOUT_UNDEFINED {
-        writeImageSubresource(image, v.subresourceRange)
-        updateImageQueue(image, v.subresourceRange)
-      }
-    }
-  }
+  // TODO: handle depenedncyFlags?
+  processBarriers(args.SrcStageMask, args.DstStageMask,
+    args.MemoryBarriers, args.BufferMemoryBarriers, args.ImageMemoryBarriers)
 }
 
 sub void handleMemoryBarriersPNext(const VkMemoryBarrier* pBarriers, u32 count) {
@@ -584,3 +572,51 @@ cmd void vkCmdPipelineBarrier(
 extern void recordFenceSignal(VkFence fence)
 extern void recordFenceWait(VkFence fence)
 extern void recordFenceReset(VkFence fence)
+
+sub void processBarriers(VkPipelineStageFlags             srcStageMask        ,
+                         VkPipelineStageFlags             dstStageMask        ,
+                         map!(u32, VkMemoryBarrier)       memoryBarriers      ,
+                         map!(u32, VkBufferMemoryBarrier) bufferMemoryBarriers,
+                         map!(u32, VkImageMemoryBarrier)  imageMemoryBarriers ) {
+  // TODO: srcStageMask/dstStageMask
+
+  if len(memoryBarriers) > 0 {
+    // TODO: srcAccessMask/dstAccessMask
+    for _ , _ , img in Images {
+      for _ , _ , aspect in img.Aspects {
+        for _ , _ , layer in aspect.Layers {
+          for _ , _ , level in layer.Levels {
+            read(level.Data)
+            write(level.Data)
+          }
+        }
+      }
+    }
+    for _ , _ , mem in DeviceMemories {
+      read(mem.Data)
+      write(mem.Data)
+    }
+  }
+  for _ , _ , v in bufferMemoryBarriers {
+    if !(v.buffer in Buffers) { vkErrorInvalidBuffer(v.buffer) } else {
+      // TODO: srcAccessMask/dstAccessMask
+      // TODO: srcQueueFamilyIndex/dstQueueFamilyIndex
+      buf := Buffers[v.buffer]
+      readMemoryInBuffer(buf, v.offset, v.size)
+      writeMemoryInBuffer(buf, v.offset, v.size)
+    }
+  }
+  for _ , _ , v in imageMemoryBarriers {
+    if !(v.image in Images) { vkErrorInvalidImage(v.image) } else {
+      // TODO: srcAccessMask/dstAccessMask
+      // TODO: srcQueueFamilyIndex/dstQueueFamilyIndex
+      image := Images[v.image]
+      transitionImageLayout(image, v.subresourceRange, v.oldLayout, v.newLayout)
+      if v.oldLayout != VK_IMAGE_LAYOUT_UNDEFINED {
+        readImageSubresource(image, v.subresourceRange)
+      }
+      writeImageSubresource(image, v.subresourceRange)
+      updateImageQueue(image, v.subresourceRange)
+    }
+  }
+}
