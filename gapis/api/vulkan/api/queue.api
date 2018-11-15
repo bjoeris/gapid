@@ -48,7 +48,7 @@
   map!(VkEvent, ref!EventObject)                          PendingEvents
   map!(VkSemaphore, ref!SemaphoreObject)                  PendingSemaphores
   @unused ref!VulkanDebugMarkerInfo                       DebugInfo
-  @untrackedMap dense_map!(u32, ref!CommandReference)        PendingCommands
+  @untrackedMap dense_map!(u32, ref!CommandReference)     PendingCommands
 }
 
 @threadSafety("system")
