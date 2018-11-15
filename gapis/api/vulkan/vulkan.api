@@ -244,28 +244,31 @@ sub ref!ExtensionSet supportedDeviceExtensions() {
   // BufferBindingOffsets[setNum][bindingNum][bufferBindingNum] :=
   //    buffer offset for given descriptor set number, binding number, and index of buffer binding
   map!(u32, map!(u32, map!(u32, VkDeviceSize))) BufferBindingOffsets
+}
+
+@internal class DynamicPipelineState {
   // The viewports set by vkCmdSetViewport
-  map!(u32, VkViewport) DynamicViewports
+  map!(u32, VkViewport) Viewports
   // The Scissors set by vkCmdSetScissor
-  map!(u32, VkRect2D) DynamicScissors
+  map!(u32, VkRect2D) Scissors
   // The value set by vkCmdSetLineWidth
-  f32 DynamicLineWidth
+  f32 LineWidth
   // The constant factor set by vkCmdSetDepthBias
-  f32 DynamicDepthBiasConstantFactor
+  f32 DepthBiasConstantFactor
   // The clamp set by vkCmdSetDepthBias
-  f32 DynamicDepthBiasClamp
+  f32 DepthBiasClamp
   // The slope factor set by vkCmdSetDepthBias
-  f32 DynamicDepthBiasSlopeFactor
+  f32 DepthBiasSlopeFactor
   // The blend constants set by vkCmdSetBlendConstants
-  f32[4] DynamicBlendConstants
+  f32[4] BlendConstants
   // The min depth bounds set by vkCmdSetDepthBounds
-  f32 DynamicMinDepthBounds
+  f32 MinDepthBounds
   // The max depth bounds set by vkCmdSetDepthBounds
-  f32 DynamicMaxDepthBounds
+  f32 MaxDepthBounds
   // The front stencil state set by vkCmdSetStencil*
-  VkStencilOpState DynamicStencilFront
+  VkStencilOpState StencilFront
   // The back stencil state set by vkCmdSetStencil*
-  VkStencilOpState DynamicStencilBack
+  VkStencilOpState StencilBack
 }
 
 @internal class ComputeInfo {
@@ -342,7 +345,8 @@ enum LastSubmissionType {
 @serialize LastSubmissionType                           LastSubmission
 @hidden @serialize UsedDescriptorSets                   ProcessedDescriptorSets
 
-@hidden @nobox @internal map!(VkQueue, ref!PushConstantInfo) LastPushConstants
+@untrackedMap map!(VkQueue, ref!DynamicPipelineState) LastDynamicPipelineStates
+@untrackedMap map!(VkQueue, ref!PushConstantInfo)     LastPushConstants
 
 
 @internal class ProcessedDescriptorSet {
@@ -404,12 +408,10 @@ sub ref!ComputeInfo lastComputeInfo() {
 }
 
 sub ref!PushConstantInfo lastPushConstants() {
-  if LastBoundQueue != null {
-    if !(LastBoundQueue.VulkanHandle in LastPushConstants) {
-      dev := Devices[LastBoundQueue.Device]
-      physDev := PhysicalDevices[dev.PhysicalDevice]
-      LastPushConstants[LastBoundQueue.VulkanHandle] = new!PushConstantInfo(make!u8(physDev.PhysicalDeviceProperties.limits.maxPushConstantsSize))
-    }
+  if !(LastBoundQueue.VulkanHandle in LastPushConstants) {
+    dev := Devices[LastBoundQueue.Device]
+    physDev := PhysicalDevices[dev.PhysicalDevice]
+    LastPushConstants[LastBoundQueue.VulkanHandle] = new!PushConstantInfo(make!u8(physDev.PhysicalDeviceProperties.limits.maxPushConstantsSize))
   }
   return switch (LastBoundQueue == null) {
     case false:
@@ -417,4 +419,20 @@ sub ref!PushConstantInfo lastPushConstants() {
     case true:
       null
   }
+}
+
+sub ref!DynamicPipelineState lastDynamicPipelineState() {
+  if LastBoundQueue != null {
+    if !(LastBoundQueue.VulkanHandle in LastDynamicPipelineStates) {
+      LastDynamicPipelineStates[LastBoundQueue.VulkanHandle] = new!DynamicPipelineState()
+    }
+  }
+
+  ldps := switch (LastBoundQueue == null) {
+    case false:
+      LastDynamicPipelineStates[LastBoundQueue.VulkanHandle]
+    case true:
+      new!DynamicPipelineState()
+  }
+  return ldps
 }
