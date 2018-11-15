@@ -272,10 +272,9 @@ func (b *graphBuilder) OnBeginCmd(ctx context.Context, cmdCtx CmdContext) {
 }
 
 func (b *graphBuilder) OnBeginSubCmd(ctx context.Context, cmdCtx CmdContext, subCmdCtx CmdContext) {
-	if _, ok := b.subCmdContexts[subCmdCtx.nodeID]; ok {
-		return
+	if _, ok := b.subCmdContexts[subCmdCtx.nodeID]; !ok {
+		b.subCmdContexts[subCmdCtx.nodeID] = subCmdCtx
 	}
-	b.subCmdContexts[subCmdCtx.nodeID] = subCmdCtx
 	fullIdx := append(api.SubCmdIdx{uint64(subCmdCtx.cmdID)}, subCmdCtx.subCmdIdx...)
 	for _, a := range b.graph.capture.APIs {
 		if sync, ok := a.(sync.SynchronizedAPI); ok {
