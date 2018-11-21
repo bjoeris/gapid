@@ -120,7 +120,7 @@ cmd VkResult vkQueueSubmit(
         } else {
           LastBoundQueue.PendingCommands[len(LastBoundQueue.PendingCommands)]
           = new!CommandReference(as!VkCommandBuffer(0), 0, cmd_vkNoCommand, 0,
-            Unsignal,    ws,    null, as!VkFence(0))
+            Unsignal,    ws,    null, as!VkFence(0), (as!u64(1) << 63) - 1)
         }
       }
     }
@@ -157,6 +157,7 @@ cmd VkResult vkQueueSubmit(
               ref.Semaphore,
               ref.SparseBinds,
               ref.SignalFence,
+              ref.RecordCmdID,
             )
             notifyPendingCommandAdded(queue)
             if ref.Type == cmd_vkCmdExecuteCommands {
@@ -182,6 +183,7 @@ cmd VkResult vkQueueSubmit(
                     sref.Semaphore,
                     sref.SparseBinds,
                     sref.SignalFence,
+                    sref.RecordCmdID,
                   )
                   notifyPendingCommandAdded(queue)
                 }
@@ -209,7 +211,7 @@ cmd VkResult vkQueueSubmit(
         } else {
           LastBoundQueue.PendingCommands[len(LastBoundQueue.PendingCommands)]
           = new!CommandReference(as!VkCommandBuffer(0), 0, cmd_vkNoCommand, 0,
-            Signal,      ss,  null, as!VkFence(0))
+            Signal,      ss,  null, as!VkFence(0), (as!u64(1) << 63) - 1)
         }
       }
     }
@@ -220,7 +222,7 @@ cmd VkResult vkQueueSubmit(
     if (Fences[fence].Signaled) { vkErrorInvalidFence(fence) } else {
       LastBoundQueue.PendingCommands[len(LastBoundQueue.PendingCommands)]
       = new!CommandReference(as!VkCommandBuffer(0), 0, cmd_vkNoCommand, 0, None,
-        as!VkSemaphore(0), null, fence)
+        as!VkSemaphore(0), null, fence, (as!u64(1) << 63) - 1)
     }
   }
 
@@ -321,7 +323,7 @@ cmd VkResult vkQueueBindSparse(
     for j in (0 .. info.waitSemaphoreCount) {
       LastBoundQueue.PendingCommands[len(LastBoundQueue.PendingCommands)]
       = new!CommandReference(as!VkCommandBuffer(0), 0, cmd_vkNoCommand, 0,
-        Unsignal,    wait_semaphores[j],    null)
+        Unsignal,    wait_semaphores[j],    null, as!VkFence(0), (as!u64(1) << 63) - 1)
     }
 
     queuedBinds := new!QueuedSparseBinds()
@@ -376,13 +378,13 @@ cmd VkResult vkQueueBindSparse(
 
     LastBoundQueue.PendingCommands[len(LastBoundQueue.PendingCommands)]
     = new!CommandReference(as!VkCommandBuffer(0), 0, cmd_vkNoCommand, 0,
-      None,          as!VkSemaphore(0),     queuedBinds)
+      None,          as!VkSemaphore(0),     queuedBinds, as!VkFence(0), (as!u64(1) << 63) - 1)
 
     signal_semaphores := info.pSignalSemaphores[0:info.signalSemaphoreCount]
     for j in (0 .. info.signalSemaphoreCount) {
       LastBoundQueue.PendingCommands[len(LastBoundQueue.PendingCommands)]
       = new!CommandReference(as!VkCommandBuffer(0), 0, cmd_vkNoCommand, 0,
-        Signal,      signal_semaphores[j],  null)
+        Signal,      signal_semaphores[j],  null, as!VkFence(0), (as!u64(1) << 63) - 1)
     }
   }
   leaveSubcontext()
@@ -391,7 +393,7 @@ cmd VkResult vkQueueBindSparse(
     if (Fences[fence].Signaled) { vkErrorInvalidFence(fence) } else {
       LastBoundQueue.PendingCommands[len(LastBoundQueue.PendingCommands)]
       = new!CommandReference(as!VkCommandBuffer(0), 0, cmd_vkNoCommand, 0, None,
-        as!VkSemaphore(0), null, fence)
+        as!VkSemaphore(0), null, fence, (as!u64(1) << 63) - 1)
     }
   }
 

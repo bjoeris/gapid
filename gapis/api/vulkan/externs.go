@@ -104,8 +104,11 @@ func (e externs) onCommandAdded(buffer VkCommandBuffer) {
 	o.initialCommands[buffer] =
 		append(o.initialCommands[buffer], e.cmd)
 	b := o.CommandBuffersʷ(e.ctx, e.w, true).Getʷ(e.ctx, e.w, true, buffer)
+	refs := b.CommandReferencesʷ(e.ctx, e.w, true)
+	c := refs.Getʷ(e.ctx, e.w, false, uint32(refs.Lenʷ(e.ctx, e.w, false)-1))
+	c.SetRecordCmdID(uint64(e.cmdID))
 	if o.AddCommand != nil {
-		o.AddCommand(b.CommandReferencesʷ(e.ctx, e.w, true).Getʷ(e.ctx, e.w, true, uint32(b.CommandReferencesʷ(e.ctx, e.w, true).Lenʷ(e.ctx, e.w, false)-1)))
+		o.AddCommand(c)
 	}
 }
 
@@ -137,7 +140,7 @@ func (e externs) onPreSubcommand(ref CommandReferenceʳ) {
 		o.PreSubcommand(ref)
 	}
 	if e.w != nil {
-		e.w.OnBeginSubCmd(e.ctx, o.SubCmdIdx)
+		e.w.OnBeginSubCmd(e.ctx, o.SubCmdIdx, api.CmdID(ref.RecordCmdID()))
 	}
 }
 
@@ -278,10 +281,10 @@ func bindSparse(ctx context.Context, w api.StateWatcher, a api.Cmd, id api.CmdID
 				bufObj.SparseMemoryBindingsʷ(ctx, w, true).Addʷ(ctx, w, true,
 					uint64(resOffset),
 					NewVkSparseMemoryBind(s.Arena, // TODO: Use scratch arena?
-						resOffset,            // resourceOffset
-						blockSize,            // size
+						resOffset,                  // resourceOffset
+						blockSize,                  // size
 						bind.Memoryʷ(ctx, w, true), // memory
-						memOffset,            // memoryOffset
+						memOffset,                  // memoryOffset
 						bind.Flagsʷ(ctx, w, true),  // flags
 					))
 				memOffset += blockSize
@@ -305,10 +308,10 @@ func bindSparse(ctx context.Context, w api.StateWatcher, a api.Cmd, id api.CmdID
 				imgObj.OpaqueSparseMemoryBindingsʷ(ctx, w, true).Addʷ(ctx, w, true,
 					uint64(resOffset),
 					NewVkSparseMemoryBind(s.Arena, // TODO: Use scratch arena?
-						resOffset,            // resourceOffset
-						blockSize,            // size
+						resOffset,                  // resourceOffset
+						blockSize,                  // size
 						bind.Memoryʷ(ctx, w, true), // memory
-						memOffset,            // memoryOffset
+						memOffset,                  // memoryOffset
 						bind.Flagsʷ(ctx, w, true),  // flags
 					))
 				memOffset += blockSize

@@ -207,6 +207,7 @@ enum SemaphoreUpdate {
   @unused VkSemaphore           Semaphore
   @unused ref!QueuedSparseBinds SparseBinds
   @unused VkFence               SignalFence
+  @unused u64                   RecordCmdID
 }
 
 @internal class BufferCommands {
@@ -286,6 +287,7 @@ sub void AddCommand(
     Semaphore: as!VkSemaphore(0),
     SparseBinds: as!ref!QueuedSparseBinds(null),
     SignalFence: as!VkFence(0),
+    RecordCmdID: (as!u64(1) << 63) - 1,
   )
   CommandBuffers[commandBuffer].CommandReferences[commandIndex] = cmd
   onCommandAdded(commandBuffer)
