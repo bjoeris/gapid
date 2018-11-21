@@ -37,7 +37,7 @@ type GraphBuilder interface {
 	GetStats() *GraphBuilderStats
 	GetGraph() *dependencyGraph
 	OnBeginCmd(ctx context.Context, cmdCtx CmdContext)
-	OnBeginSubCmd(ctx context.Context, cmdCtx CmdContext, subCmdCtx CmdContext)
+	OnBeginSubCmd(ctx context.Context, cmdCtx CmdContext, subCmdCtx CmdContext, recordCmdID api.CmdID)
 	Close()
 }
 
@@ -271,19 +271,13 @@ func (b *graphBuilder) OnBeginCmd(ctx context.Context, cmdCtx CmdContext) {
 	b.subCmdContexts[cmdCtx.nodeID] = cmdCtx
 }
 
-func (b *graphBuilder) OnBeginSubCmd(ctx context.Context, cmdCtx CmdContext, subCmdCtx CmdContext) {
+func (b *graphBuilder) OnBeginSubCmd(ctx context.Context, cmdCtx CmdContext, subCmdCtx CmdContext, recordCmdID api.CmdID) {
 	if _, ok := b.subCmdContexts[subCmdCtx.nodeID]; !ok {
 		b.subCmdContexts[subCmdCtx.nodeID] = subCmdCtx
 	}
-	fullIdx := append(api.SubCmdIdx{uint64(subCmdCtx.cmdID)}, subCmdCtx.subCmdIdx...)
-	for _, a := range b.graph.capture.APIs {
-		if sync, ok := a.(sync.SynchronizedAPI); ok {
-			if initCmdID, ok := sync.FlattenSubcommandIdx(fullIdx, b.syncData, true); ok && initCmdID != api.CmdNoID {
-				initNodeID := b.graph.GetCmdNodeID(initCmdID, api.SubCmdIdx{})
-				b.initCmdNodeIDs[subCmdCtx.nodeID] =
-					append(b.initCmdNodeIDs[subCmdCtx.nodeID], initNodeID)
-			}
-		}
+	if recordCmdID != api.CmdNoID {
+		recordNodeID := b.graph.GetCmdNodeID(recordCmdID, api.SubCmdIdx{})
+		b.initCmdNodeIDs[subCmdCtx.nodeID] = append(b.initCmdNodeIDs[subCmdCtx.nodeID], recordNodeID)
 	}
 }
 

@@ -30,7 +30,7 @@ type StateWatcher interface {
 	// OnEndCmd is called at the end of each API call
 	OnEndCmd(ctx context.Context, cmdID CmdID, cmd Cmd)
 
-	OnBeginSubCmd(ctx context.Context, subCmdIdx SubCmdIdx)
+	OnBeginSubCmd(ctx context.Context, subCmdIdx SubCmdIdx, recordCmdID CmdID)
 
 	OnEndSubCmd(ctx context.Context)
 

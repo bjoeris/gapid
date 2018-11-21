@@ -145,7 +145,7 @@ func (b *dependencyGraphBuilder) OnEndCmd(ctx context.Context, cmdID api.CmdID, 
 	b.subCmdStack = b.subCmdStack[:0]
 }
 
-func (b *dependencyGraphBuilder) OnBeginSubCmd(ctx context.Context, subCmdIdx api.SubCmdIdx) {
+func (b *dependencyGraphBuilder) OnBeginSubCmd(ctx context.Context, subCmdIdx api.SubCmdIdx, recordCmdID api.CmdID) {
 	if len(b.subCmdStack) == 0 {
 		log.E(ctx, "OnBeginSubCmd called while not processing any command")
 	}
@@ -154,13 +154,13 @@ func (b *dependencyGraphBuilder) OnBeginSubCmd(ctx context.Context, subCmdIdx ap
 	if b.config.MergeSubCmdNodes {
 		subCmdCtx := cmdCtx
 		subCmdCtx.subCmdIdx = subCmdIdx
-		b.graphBuilder.OnBeginSubCmd(ctx, cmdCtx, subCmdCtx)
+		b.graphBuilder.OnBeginSubCmd(ctx, cmdCtx, subCmdCtx, recordCmdID)
 		return
 	}
 
 	subCmdCtx := b.graphBuilder.GetSubCmdContext(subCmdIdx, cmdCtx)
 
-	b.graphBuilder.OnBeginSubCmd(ctx, cmdCtx, subCmdCtx)
+	b.graphBuilder.OnBeginSubCmd(ctx, cmdCtx, subCmdCtx, recordCmdID)
 	b.fragWatcher.OnBeginSubCmd(ctx, cmdCtx, subCmdCtx)
 	b.memWatcher.OnBeginSubCmd(ctx, cmdCtx, subCmdCtx)
 	b.forwardWatcher.OnBeginSubCmd(ctx, cmdCtx, subCmdCtx)
