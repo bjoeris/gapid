@@ -279,16 +279,6 @@ func (b *graphBuilder) OnBeginSubCmd(ctx context.Context, cmdCtx CmdContext, sub
 		recordNodeID := b.graph.GetCmdNodeID(recordCmdID, api.SubCmdIdx{})
 		b.initCmdNodeIDs[subCmdCtx.nodeID] = append(b.initCmdNodeIDs[subCmdCtx.nodeID], recordNodeID)
 	}
-	// fullIdx := append(api.SubCmdIdx{uint64(subCmdCtx.cmdID)}, subCmdCtx.subCmdIdx...)
-	// for _, a := range b.graph.capture.APIs {
-	// 	if sync, ok := a.(sync.SynchronizedAPI); ok {
-	// 		if initCmdID, ok := sync.FlattenSubcommandIdx(fullIdx, b.syncData, true); ok && initCmdID != api.CmdNoID {
-	// 			initNodeID := b.graph.GetCmdNodeID(initCmdID, api.SubCmdIdx{})
-	// 			b.initCmdNodeIDs[subCmdCtx.nodeID] =
-	// 				append(b.initCmdNodeIDs[subCmdCtx.nodeID], initNodeID)
-	// 		}
-	// 	}
-	// }
 }
 
 func (b *graphBuilder) Close() {}
