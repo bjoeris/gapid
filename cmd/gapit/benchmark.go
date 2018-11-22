@@ -89,7 +89,7 @@ func (verb *benchmarkVerb) Run(ctx context.Context, flags flag.FlagSet) error {
 
 	verb.startTime = time.Now()
 
-	client, err := getGapis(ctx, GapisFlags{}, GapirFlags{})
+	client, err := getGapis(ctx, verb.Gapis, verb.Gapir)
 	if err != nil {
 		return log.Err(ctx, err, "Failed to connect to the GAPIS server")
 	}
