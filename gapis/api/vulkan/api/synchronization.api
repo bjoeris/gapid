@@ -204,6 +204,9 @@ cmd VkResult vkWaitForFences(
   @unused VkQueue                   LastQueue
   @unused s32                       SubmitCount
   @unused bool                      Signaled
+  @unused bool                      SavedSignaled
+  @unused bool                      TemporaryExternal
+  @unused bool                      PermanentExternal
   @unused ref!VulkanDebugMarkerInfo DebugInfo
   @unused VkQueue                   WaitingQueue
   ref!TimelineSemaphoreInfo         TimelineSemaphoreInfo

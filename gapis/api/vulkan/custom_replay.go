@@ -1150,6 +1150,14 @@ func (a *VkImportFenceFdKHR) Mutate(ctx context.Context, id api.CmdID, s *api.Gl
 	return a.mutate(ctx, id, s, nil, w)
 }
 
+func (a *VkImportSemaphoreFdKHR) Mutate(ctx context.Context, id api.CmdID, s *api.GlobalState, b *builder.Builder, w api.StateWatcher) error {
+	return a.mutate(ctx, id, s, nil, w)
+}
+
+func (a *VkGetSemaphoreFdKHR) Mutate(ctx context.Context, id api.CmdID, s *api.GlobalState, b *builder.Builder, w api.StateWatcher) error {
+	return a.mutate(ctx, id, s, nil, w)
+}
+
 func (a *VkGetMemoryFdKHR) Mutate(ctx context.Context, id api.CmdID, s *api.GlobalState, b *builder.Builder, w api.StateWatcher) error {
 	return a.mutate(ctx, id, s, nil, w)
 }
@@ -1329,6 +1337,55 @@ func (h *vkQueueSubmitHijack) processFence() {
 		}
 	}
 }
+
+func (h *vkQueueSubmitHijack) processSemaphores() {
+	l := h.s.MemoryLayout
+	submitInfos := h.submitInfos()
+	submitInfosChanged := false
+	for i := range submitInfos {
+		waitSemaphoreCount := uint64(submitInfos[i].WaitSemaphoreCount())
+		waitSemaphores := submitInfos[i].PWaitSemaphores().Slice(0, waitSemaphoreCount, l).MustRead(h.ctx, h.origSubmit, h.s, nil)
+		newWaitSemaphores := waitSemaphores[:0]
+		waitSemaphoresChanged := false
+		for _, sem := range waitSemaphores {
+			if !h.c.Semaphores().Get(sem).Signaled() {
+				// According to the state tracking, this would be a wait on a semaphore that does not have an already queued signal operation.
+				// Either this is an error, or this was an external semaphore at trace time.
+				// TODO: this needs to be re-evaluated for timeline semaphores
+
+				// Remove this semaphore from the wait semaphores
+				waitSemaphoresChanged = true
+			} else {
+				newWaitSemaphores = append(newWaitSemaphores, sem)
+			}
+		}
+
+		signalSemaphoreCount := uint64(submitInfos[i].SignalSemaphoreCount())
+		signalSemaphores := submitInfos[i].PSignalSemaphores().Slice(0, signalSemaphoreCount, l).MustRead(h.ctx, h.origSubmit, h.s, nil)
+		for _, sem := range signalSemaphores {
+			if h.c.Semaphores().Get(sem).Signaled() {
+				// According to the state tracking, this would be a signal on a semaphore that already has a queued signal operation.
+				// Either this is an error, or this was an external semaphore at trace time.
+				// TODO: this needs to be re-evaluated for timeline semaphores.
+
+				// Add this semaphore to the wait semaphore (so we will wait on it to unsignal, before signalling)
+				newWaitSemaphores = append(newWaitSemaphores, sem)
+				waitSemaphoresChanged = true
+			}
+		}
+
+		if waitSemaphoresChanged {
+			pWaitSemaphores := h.mustAllocData(waitSemaphores)
+			submitInfos[i].SetPWaitSemaphores(NewVkSemaphoreᶜᵖ(pWaitSemaphores.Ptr()))
+			h.hijack().AddRead(pWaitSemaphores.Data())
+			submitInfosChanged = true
+		}
+	}
+	if submitInfosChanged {
+		h.setSubmitInfos(submitInfos)
+	}
+}
+
 func (a *VkQueueSubmit) Mutate(ctx context.Context, id api.CmdID, s *api.GlobalState, b *builder.Builder, w api.StateWatcher) error {
 	if b == nil {
 		return a.mutate(ctx, id, s, b, w)
@@ -1336,6 +1393,7 @@ func (a *VkQueueSubmit) Mutate(ctx context.Context, id api.CmdID, s *api.GlobalS
 	h := newVkQueueSubmitHijack(ctx, a, id, s, b, w)
 	defer h.cleanup()
 	h.processFence()
+	h.processSemaphores()
 	h.processExternalMemory()
 	return h.mutate()
 }
