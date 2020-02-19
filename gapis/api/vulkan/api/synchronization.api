@@ -44,6 +44,9 @@
   @unused VkDevice                  Device
   @unused VkFence                   VulkanHandle
   @unused bool                      Signaled
+  @unused bool                      SavedSignaled
+  @unused bool                      TemporaryExternal
+  @unused bool                      PermanentExternal
   @unused ref!VulkanDebugMarkerInfo DebugInfo
 }
 
@@ -87,6 +90,7 @@ cmd VkResult vkCreateFence(
 
 @threadSafety("system")
 @indirect("VkDevice")
+@custom
 cmd void vkDestroyFence(
     VkDevice                     device,
     VkFence                      fence,
@@ -97,6 +101,7 @@ cmd void vkDestroyFence(
 
 @threadSafety("system")
 @indirect("VkDevice")
+@custom
 cmd VkResult vkResetFences(
     VkDevice       device,
     u32            fenceCount,
@@ -106,8 +111,13 @@ cmd VkResult vkResetFences(
   for i in (0 .. fenceCount) {
     f := fences[i]
     if !(f in Fences) { vkErrorInvalidFence(fences[i]) }
-    Fences[f].Signaled = false
-    recordFenceReset(f)
+    if Fences[f].TemporaryExternal {
+      Fences[f].TemporaryExternal = false
+      Fences[f].Signaled = Fences[f].SavedSignaled
+    } else {
+      Fences[f].Signaled = false
+      recordFenceReset(f)
+    }
   }
   return ?
 }
@@ -120,11 +130,17 @@ cmd VkResult vkGetFenceStatus(
     VkFence  fence) {
   if !(device in Devices) { vkErrorInvalidDevice(device) }
   if !(fence in Fences) { vkErrorInvalidFence(fence) }
+
   res := ?
   if res == VK_SUCCESS {
     // The fence was signaled, so treat this as a wait on the fence.
-    if Fences[fence].Signaled {
+    f := Fences[fence]
+    if f.Signaled {
       recordFenceWait(fence)
+    } else if f.TemporaryExternal || f.PermanentExternal {
+      // As far as our tracking is concerned, the fence should not have been
+      // signaled, but it is, and the fence is external. That must mean that
+      // it was signaled by an external process.
     } else {
       // TODO: handle case when signal comes after wait (e.g. in a multi-threaded app)
       vkErrorInvalidFence(fence)
@@ -133,10 +149,16 @@ cmd VkResult vkGetFenceStatus(
   return res
 }
 
+@internal class FenceMap {
+  @untrackedMap @untracked
+  dense_map!(u32, VkFence) Fences
+}
+
 @threadSafety("system")
 @indirect("VkDevice")
 @threadsafe
 @alive
+@custom
 cmd VkResult vkWaitForFences(
     VkDevice       device,
     u32            fenceCount,
@@ -145,17 +167,28 @@ cmd VkResult vkWaitForFences(
     u64            timeout) { /// timeout in nanoseconds
   if !(device in Devices) { vkErrorInvalidDevice(device) }
   fences := pFences[0:fenceCount]
+  fencesMap := new!FenceMap()
   for i in (0 .. fenceCount) {
-    f := fences[i]
-    if !(f in Fences) { vkErrorInvalidFence(fences[i]) }
-    if Fences[f].Signaled {
-      recordFenceWait(f)
-    } else {
-      // TODO: handle case when signal comes after wait (e.g. in a multi-threaded app)
-      vkErrorInvalidFence(f)
+    fencesMap.Fences[i] = fences[i]
+  }
+  res := ?
+  if res == VK_SUCCESS {
+    for i in (0 .. fenceCount) {
+      f := fencesMap.Fences[i]
+      if !(f in Fences) { vkErrorInvalidFence(f) }
+      if Fences[f].Signaled {
+        recordFenceWait(f)
+      } else if Fences[f].TemporaryExternal || Fences[f].PermanentExternal {
+        // As far as our tracking is concerned, the fence should not have been
+        // signaled, but it is, and the fence is external. That must mean that
+        // it was signaled by an external process.
+      } else {
+        // TODO: handle case when signal comes after wait (e.g. in a multi-threaded app)
+        vkErrorInvalidFence(f)
+      }
     }
   }
-  return ?
+  return res
 }
 
 ///////////////

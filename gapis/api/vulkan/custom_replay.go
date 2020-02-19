@@ -16,6 +16,7 @@ package vulkan
 
 import (
 	"context"
+	"math"
 	"strings"
 
 	"github.com/google/gapid/core/log"
@@ -835,14 +836,164 @@ func (c *VkGetPhysicalDeviceSurfacePresentModesKHR) Mutate(ctx context.Context, 
 	return nil
 }
 
+func (a *VkDestroyFence) Mutate(ctx context.Context, id api.CmdID, s *api.GlobalState, b *builder.Builder, w api.StateWatcher) error {
+	if b != nil {
+		c := GetState(s)
+		extFences := c.externalFenceSignals[a.Device()]
+		if _, ok := extFences[a.Fence()]; ok {
+			delete(extFences, a.Fence())
+			cb := CommandBuilder{Thread: a.Thread(), Arena: s.Arena}
+			pFences := s.AllocDataOrPanic(ctx, a.Fence())
+			defer pFences.Free()
+			wait := cb.VkWaitForFences(
+				a.Device(),
+				1,
+				pFences.Ptr(),
+				1,
+				math.MaxUint64,
+				VkResult_VK_SUCCESS)
+			wait.AddRead(pFences.Data())
+			if err := wait.mutate(ctx, api.CmdNoID, s, b, nil); err != nil {
+				return err
+			}
+		}
+	}
+	return a.mutate(ctx, id, s, b, w)
+}
+
+func (a *VkResetFences) Mutate(ctx context.Context, id api.CmdID, s *api.GlobalState, b *builder.Builder, w api.StateWatcher) error {
+	if b != nil {
+		c := GetState(s)
+		a.Extras().Observations().ApplyReads(s.Memory.ApplicationPool())
+		fences := a.PFences().Slice(0, uint64(a.FenceCount()), s.MemoryLayout).MustRead(ctx, a, s, nil)
+		extFences := c.externalFenceSignals[a.Device()]
+		waitFences := []VkFence{}
+		for _, f := range fences {
+			if _, ok := extFences[f]; ok {
+				// This is an external fence, and this process has submitted a signal operation.
+				// We have to pessimistically assume that the other already waited on this fence.
+				// A later external fence/semaphore might implicitly need to happen after the completion of the submitted fence signal operation.
+				// We wont be able to wait on the fence after this reset, so we need to wait now.
+				waitFences = append(waitFences, f)
+				delete(extFences, f)
+			}
+		}
+		if len(waitFences) > 0 {
+			cb := CommandBuilder{Thread: a.Thread(), Arena: s.Arena}
+			pFences := s.AllocDataOrPanic(ctx, waitFences)
+			defer pFences.Free()
+			wait := cb.VkWaitForFences(
+				a.Device(),
+				uint32(len(waitFences)),
+				pFences.Ptr(),
+				1,
+				math.MaxUint64,
+				VkResult_VK_SUCCESS)
+			wait.AddRead(pFences.Data())
+			if err := wait.mutate(ctx, api.CmdNoID, s, b, nil); err != nil {
+				return err
+			}
+		}
+	}
+	return a.mutate(ctx, id, s, b, w)
+}
+
+func externalWait(ctx context.Context, cmd api.Cmd, s *api.GlobalState, b *builder.Builder, device VkDevice) {
+	// wait on every every previously signaled external fence/semaphore that has not already been waited on
+	c := GetState(s)
+	extFences := c.externalFenceSignals[device]
+	c.externalFenceSignals[device] = make(map[VkFence]struct{})
+	if len(extFences) > 0 {
+		extFencesSlice := make([]VkFence, 0, len(extFences))
+		for f := range extFences {
+			extFencesSlice = append(extFencesSlice, f)
+		}
+		cb := CommandBuilder{Thread: cmd.Thread(), Arena: s.Arena}
+		pFences := s.AllocDataOrPanic(ctx, extFencesSlice)
+		defer pFences.Free()
+		wait := cb.VkWaitForFences(
+			device,
+			uint32(len(extFences)),
+			pFences.Ptr(),
+			1,
+			math.MaxUint64,
+			VkResult_VK_SUCCESS)
+		wait.AddRead(pFences.Data())
+		if err := wait.mutate(ctx, api.CmdNoID, s, b, nil); err != nil {
+			// TODO: what should I do with this error?
+		}
+	}
+
+}
+
 func (a *VkGetFenceStatus) Mutate(ctx context.Context, id api.CmdID, s *api.GlobalState, b *builder.Builder, w api.StateWatcher) error {
 	cb := CommandBuilder{Thread: a.Thread(), Arena: s.Arena}
 	err := a.mutate(ctx, id, s, b, w)
-	if b == nil || err != nil {
+	if b == nil || err != nil || a.Result() != VkResult_VK_SUCCESS {
 		return err
 	}
+	f := GetState(s).Fences().Get(a.Fence())
+	if f.Signaled() {
+		err := cb.ReplayGetFenceStatus(a.Device(), a.Fence(), a.Result(), a.Result()).Mutate(ctx, id, s, b, nil)
+		if err != nil {
+			return err
+		}
+	}
+	if f.TemporaryExternal() || f.PermanentExternal() {
+		externalWait(ctx, a, s, b, a.Device())
+	}
+	return nil
+}
 
-	return cb.ReplayGetFenceStatus(a.Device(), a.Fence(), a.Result(), a.Result()).Mutate(ctx, id, s, b, nil)
+func (a *VkWaitForFences) Mutate(ctx context.Context, id api.CmdID, s *api.GlobalState, b *builder.Builder, w api.StateWatcher) error {
+	if b == nil || a.Result() != VkResult_VK_SUCCESS {
+		return a.mutate(ctx, id, s, b, w)
+	}
+	// Filter out the external fences
+	c := GetState(s)
+	a.Extras().Observations().ApplyReads(s.Memory.ApplicationPool())
+	fences := a.PFences().Slice(0, uint64(a.FenceCount()), s.MemoryLayout).MustRead(ctx, a, s, nil)
+	hasExternalFence := false
+	newFences := fences[:0]
+	for _, f := range fences {
+		o := c.Fences().Get(f)
+		if o.TemporaryExternal() || o.PermanentExternal() {
+			hasExternalFence = true
+		}
+		if o.Signaled() {
+			// State tracking says this fence is not signaled (and does
+			// not have a pending signal operation).
+			// Filter out this fence for actual replay--this was either
+			// an external fence, or the api will report an error.
+			newFences = append(newFences, f)
+		}
+	}
+	if hasExternalFence {
+		externalWait(ctx, a, s, b, a.Device())
+	}
+	newFenceCount := uint32(len(newFences))
+	if 0 == len(newFences) {
+		return nil
+	} else if newFenceCount < a.FenceCount() {
+		pFences := s.AllocDataOrPanic(ctx, newFences)
+		defer pFences.Free()
+		cb := CommandBuilder{
+			Thread: a.Thread(),
+			Arena:  s.Arena,
+		}
+		hijack := cb.VkWaitForFences(
+			a.Device(),
+			newFenceCount,
+			pFences.Ptr(),
+			a.WaitAll(),
+			a.Timeout(),
+			a.Result())
+		hijack.Extras().MustClone(a.Extras().All()...)
+		hijack.AddRead(pFences.Data())
+		return hijack.mutate(ctx, id, s, b, w)
+	} else {
+		return a.mutate(ctx, id, s, b, w)
+	}
 }
 
 func (a *VkGetEventStatus) Mutate(ctx context.Context, id api.CmdID, s *api.GlobalState, b *builder.Builder, w api.StateWatcher) error {
@@ -989,6 +1140,14 @@ func processExternalImageBarriers(barriers *[]VkImageMemoryBarrier) bool {
 		}
 	}
 	return hasExternImageBarrier
+}
+
+func (a *VkGetFenceFdKHR) Mutate(ctx context.Context, id api.CmdID, s *api.GlobalState, b *builder.Builder, w api.StateWatcher) error {
+	return a.mutate(ctx, id, s, nil, w)
+}
+
+func (a *VkImportFenceFdKHR) Mutate(ctx context.Context, id api.CmdID, s *api.GlobalState, b *builder.Builder, w api.StateWatcher) error {
+	return a.mutate(ctx, id, s, nil, w)
 }
 
 func (a *VkGetMemoryFdKHR) Mutate(ctx context.Context, id api.CmdID, s *api.GlobalState, b *builder.Builder, w api.StateWatcher) error {
@@ -1157,12 +1316,26 @@ func (h *vkQueueSubmitHijack) mustAlloc(size uint64) api.AllocResult {
 	return res
 }
 
+func (h *vkQueueSubmitHijack) processFence() {
+	if h.get().Fence() != 0 {
+		f := h.c.Fences().Get(h.get().Fence())
+		if f.PermanentExternal() || f.TemporaryExternal() {
+			h.c.externalFenceSignals[f.Device()][f.VulkanHandle()] = struct{}{}
+			if f.Signaled() {
+				// This fence was already signaled, so it is not valid to submit it.
+				// This could have been valid at trace time, since this was an external fence
+				h.hijack().SetFence(VkFence(0))
+			}
+		}
+	}
+}
 func (a *VkQueueSubmit) Mutate(ctx context.Context, id api.CmdID, s *api.GlobalState, b *builder.Builder, w api.StateWatcher) error {
 	if b == nil {
 		return a.mutate(ctx, id, s, b, w)
 	}
 	h := newVkQueueSubmitHijack(ctx, a, id, s, b, w)
 	defer h.cleanup()
+	h.processFence()
 	h.processExternalMemory()
 	return h.mutate()
 }

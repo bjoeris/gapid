@@ -31,23 +31,26 @@ import (
 )
 
 type customState struct {
-	SubCmdIdx           api.SubCmdIdx
-	LastSubCmdIdx       api.SubCmdIdx
-	PreSubcommand       func(interface{})
-	PostSubcommand      func(interface{})
-	AddCommand          func(interface{})
-	IsRebuilding        bool
-	pushMarkerGroup     func(name string, next bool, ty MarkerType)
-	popMarkerGroup      func(ty MarkerType)
-	initialCommands     map[VkCommandBuffer][]api.Cmd
-	deferredSubmissions map[Submissionʳ]api.SubCmdIdx
-	waitingSemaphores   map[VkSemaphore][]uint64
+	SubCmdIdx            api.SubCmdIdx
+	LastSubCmdIdx        api.SubCmdIdx
+	PreSubcommand        func(interface{})
+	PostSubcommand       func(interface{})
+	AddCommand           func(interface{})
+	IsRebuilding         bool
+	pushMarkerGroup      func(name string, next bool, ty MarkerType)
+	popMarkerGroup       func(ty MarkerType)
+	initialCommands      map[VkCommandBuffer][]api.Cmd
+	deferredSubmissions  map[Submissionʳ]api.SubCmdIdx
+	waitingSemaphores    map[VkSemaphore][]uint64
+	externalFenceSignals map[VkDevice]map[VkFence]struct{}
 }
 
 func (c *customState) init(s *State) {
 	c.initialCommands = make(map[VkCommandBuffer][]api.Cmd)
 	c.deferredSubmissions = make(map[Submissionʳ]api.SubCmdIdx)
 	c.waitingSemaphores = make(map[VkSemaphore][]uint64)
+	c.externalFenceSignals = make(map[VkDevice]map[VkFence]struct{})
+
 	for b, cb := range s.CommandBuffers().All() {
 		existingCommands := cb.CommandReferences().Len()
 		c.initialCommands[b] = make([]api.Cmd, existingCommands)

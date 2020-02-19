@@ -264,8 +264,13 @@ sub bool executeSubmit(VkQueue queue, ref!Submission sub, bool dont_queue) {
     }
     if sub.SignalFence != as!VkFence(0) {
       fenceObj := Fences[sub.SignalFence]
-      fenceObj.Signaled = true
-      recordFenceSignal(sub.SignalFence)
+      isExternal := fenceObj.TemporaryExternal || fenceObj.PermanentExternal
+      if !fenceObj.Signaled {
+        fenceObj.Signaled = true
+        recordFenceSignal(sub.SignalFence)
+      } else if !isExternal {
+        vkErrorInvalidFence(sub.SignalFence)
+      }
     }
     if dont_queue {
       finishedExecuteDeferredSubmit(sub)
