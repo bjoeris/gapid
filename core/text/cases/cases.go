@@ -40,15 +40,17 @@ func Snake(s string) Words {
 func Pascal(s string) Words {
 	out := Words{}
 	buf := bytes.Buffer{}
-	wasLetter := false
+	wasUpper := true
+	wasNumber := true
 	for _, r := range []rune(s) {
-		if wasLetter && unicode.IsUpper(r) {
+		if (!wasUpper && unicode.IsUpper(r)) || (!wasNumber && unicode.IsNumber(r)) {
 			// Start of new word. Flush buf.
 			out = append(out, buf.String())
 			buf.Reset()
 		}
 		buf.WriteRune(r)
-		wasLetter = unicode.IsLetter(r)
+		wasUpper = unicode.IsUpper(r)
+		wasNumber = unicode.IsNumber(r)
 	}
 	if buf.Len() > 0 {
 		out = append(out, buf.String())
