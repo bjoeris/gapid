@@ -28,7 +28,7 @@ extern u32 numberOfPNext(const void* pNext)
   u32 Val
 }
 
-@interal class MutableVkDeviceSize {
+@internal class MutableVkDeviceSize {
   VkDeviceSize Val
 }
 
@@ -636,7 +636,7 @@ sub VkQueueFlags AddQueueFlag(VkQueueFlags flags, VkQueueFlagBits bit) {
   return as!VkQueueFlags(as!u32(flags) | as!u32(bit))
 }
 
-class VulkanStructHeader {
+@internal class VulkanStructHeader {
   VkStructureType SType
   void*           PNext
 }

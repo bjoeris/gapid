@@ -384,7 +384,7 @@ sub ref!ExtensionSet supportedDeviceExtensions() {
   @hidden @nobox @internal u8[]     Data
 }
 
-enum LastSubmissionType {
+@internal enum LastSubmissionType {
   SUBMIT  = 0
   PRESENT = 1
 }

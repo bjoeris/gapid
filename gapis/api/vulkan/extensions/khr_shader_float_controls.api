@@ -71,6 +71,7 @@ class VkPhysicalDeviceFloatControlsPropertiesKHR {
 }
 
 @extension("VK_KHR_shader_float_controls")
+@internal
 class PhysicalDeviceFloatControlsPropertiesKHR {
     VkShaderFloatControlsIndependenceKHR    DenormBehaviorIndependence
     VkShaderFloatControlsIndependenceKHR    RoundingModeIndependence

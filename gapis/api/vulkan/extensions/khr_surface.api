@@ -253,7 +253,7 @@ cmd VkResult vkGetPhysicalDeviceSurfacePresentModesKHR(
 // State tracking //
 ////////////////////
 
-enum SurfaceType {
+@internal enum SurfaceType {
   SURFACE_TYPE_UNKNOWN = 0
   SURFACE_TYPE_XCB     = 1
   SURFACE_TYPE_ANDROID = 2

@@ -49,6 +49,7 @@ class VkPhysicalDeviceVulkanMemoryModelFeaturesKHR {
 }
 
 @extension("VK_KHR_vulkan_memory_model")
+@internal
 class PhysicalDeviceVulkanMemoryModelFeaturesKHR {
     VkBool32           VulkanMemoryModel
     VkBool32           VulkanMemoryModelDeviceScope

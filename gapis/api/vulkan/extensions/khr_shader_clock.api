@@ -48,6 +48,7 @@ class VkPhysicalDeviceShaderClockFeaturesKHR {
 }
 
 @extension("VK_KHR_shader_clock")
+@internal
 class PhysicalDeviceShaderClockFeaturesKHR {
     VkBool32           ShaderSubgroupClock
     VkBool32           ShaderDeviceClock

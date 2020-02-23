@@ -40,7 +40,7 @@
 // Query pool and query //
 //////////////////////////
 
-enum QueryStatus {
+@internal enum QueryStatus {
   QUERY_STATUS_INACTIVE      = 0
   QUERY_STATUS_ACTIVE        = 1
   QUERY_STATUS_COMPLETE      = 2

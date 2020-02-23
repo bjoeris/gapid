@@ -215,8 +215,8 @@ cmd VkResult vkCreateRenderPass(
     if (subpass.pDepthStencilAttachment != null) {
       depth_attachment := subpass.pDepthStencilAttachment[0]
       description.DepthStencilAttachment = new!VkAttachmentReference(
-        Attachment: depth_attachment.Attachment,
-        Layout:     depth_attachment.Layout)
+        attachment: depth_attachment.attachment,
+        layout:     depth_attachment.layout)
     }
     preserveAttachments := subpass.pPreserveAttachments[0:subpass.preserveAttachmentCount]
     for j in (0 .. subpass.preserveAttachmentCount) {
@@ -299,17 +299,17 @@ sub void RecordSubpassBegin(ref!CommandBufferObject cb, u32 subpass) {
   cb.CurrentRecordingSubpass = subpass
   rp := cb.CurrentRecordingRenderpass
   for _, _, v in rp.SubpassDescriptions[subpass].InputAttachments {
-    if v.Attachment != VK_ATTACHMENT_UNUSED {
-      l := v.Layout
+    if v.attachment != VK_ATTACHMENT_UNUSED {
+      l := v.layout
       aspect := MutableAspect(as!VkImageAspectFlags(0))
       if rp.InputAttachmentAspectInfo != null {
         for _, _, ar in rp.InputAttachmentAspectInfo.AspectReferences {
-          if (ar.subpass == subpass) && (ar.inputAttachmentIndex == v.Attachment) {
+          if (ar.subpass == subpass) && (ar.inputAttachmentIndex == v.attachment) {
             aspect.aspect = ar.aspectMask
           }
         }
       }
-      view := cb.CurrentRecordingFramebuffer.ImageAttachments[v.Attachment]
+      view := cb.CurrentRecordingFramebuffer.ImageAttachments[v.attachment]
       rng := view.SubresourceRange
       if aspect.aspect != as!VkImageAspectFlags(0) {
         rng.aspectMask = aspect.aspect
@@ -394,21 +394,21 @@ sub void transitionSubpassAttachmentLayouts(u32 subpass) {
   if subpass < len(ldi.RenderPass.SubpassDescriptions) {
     subpassDesc := ldi.RenderPass.SubpassDescriptions[subpass]
     for _, _, a in subpassDesc.InputAttachments {
-      attachment := ldi.Framebuffer.ImageAttachments[a.Attachment]
-      transitionImageViewLayout(attachment, VK_IMAGE_LAYOUT_UNDEFINED, a.Layout)
+      attachment := ldi.Framebuffer.ImageAttachments[a.attachment]
+      transitionImageViewLayout(attachment, VK_IMAGE_LAYOUT_UNDEFINED, a.layout)
     }
     for _ , _ , a in subpassDesc.ColorAttachments {
-      attachment := ldi.Framebuffer.ImageAttachments[a.Attachment]
-      transitionImageViewLayout(attachment, VK_IMAGE_LAYOUT_UNDEFINED, a.Layout)
+      attachment := ldi.Framebuffer.ImageAttachments[a.attachment]
+      transitionImageViewLayout(attachment, VK_IMAGE_LAYOUT_UNDEFINED, a.layout)
     }
     for _ , _ , a in subpassDesc.ResolveAttachments {
-      attachment := ldi.Framebuffer.ImageAttachments[a.Attachment]
-      transitionImageViewLayout(attachment, VK_IMAGE_LAYOUT_UNDEFINED, a.Layout)
+      attachment := ldi.Framebuffer.ImageAttachments[a.attachment]
+      transitionImageViewLayout(attachment, VK_IMAGE_LAYOUT_UNDEFINED, a.layout)
     }
     if subpassDesc.DepthStencilAttachment != null {
       dsRef := subpassDesc.DepthStencilAttachment
-      attachment := ldi.Framebuffer.ImageAttachments[dsRef.Attachment]
-      transitionImageViewLayout(attachment, VK_IMAGE_LAYOUT_UNDEFINED, dsRef.Layout)
+      attachment := ldi.Framebuffer.ImageAttachments[dsRef.attachment]
+      transitionImageViewLayout(attachment, VK_IMAGE_LAYOUT_UNDEFINED, dsRef.layout)
     }
   }
 }

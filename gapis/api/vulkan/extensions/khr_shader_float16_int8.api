@@ -48,6 +48,7 @@ class VkPhysicalDeviceShaderFloat16Int8FeaturesKHR {
 }
 
 @extension("VK_KHR_shader_float16_int8")
+@internal
 class PhysicalDeviceShaderFloat16Int8FeaturesKHR {
     VkBool32           ShaderFloat16
     VkBool32           ShaderInt8

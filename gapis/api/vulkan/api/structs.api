@@ -245,7 +245,7 @@ class VkPhysicalDeviceLimits {
   VkSampleCountFlags framebufferColorSampleCounts
   VkSampleCountFlags framebufferDepthSampleCounts
   VkSampleCountFlags framebufferStencilSampleCounts
-  VkSampleCountFlags framebufferNoAttachmentSampleCounts
+  VkSampleCountFlags framebufferNoAttachmentsSampleCounts
   u32                maxColorAttachments                 /// max num of framebuffer color attachments
 
   VkSampleCountFlags sampledImageColorSampleCounts
@@ -865,15 +865,15 @@ class VkDescriptorSetAllocateInfo {
 }
 
 class VkDescriptorImageInfo {
-  VkSampler     Sampler
-  VkImageView   ImageView
-  VkImageLayout ImageLayout
+  VkSampler     sampler
+  VkImageView   imageView
+  VkImageLayout imageLayout
 }
 
 class VkDescriptorBufferInfo {
-  VkBuffer     Buffer /// Buffer used for this descriptor when the descriptor is UNIFORM_BUFFER[_DYNAMIC]
-  VkDeviceSize Offset /// Base offset from buffer start in bytes to update in the descriptor set.
-  VkDeviceSize Range  /// Size in bytes of the buffer resource for this descriptor update.
+  VkBuffer     buffer /// Buffer used for this descriptor when the descriptor is UNIFORM_BUFFER[_DYNAMIC]
+  VkDeviceSize offset /// Base offset from buffer start in bytes to update in the descriptor set.
+  VkDeviceSize range  /// Size in bytes of the buffer resource for this descriptor update.
 }
 
 class VkWriteDescriptorSet {
@@ -926,8 +926,8 @@ class VkAttachmentDescription {
 }
 
 class VkAttachmentReference {
-  u32           Attachment // We have capitalized these so we can manipulate
-  VkImageLayout Layout     // them in Go
+  u32           attachment // We have capitalized these so we can manipulate
+  VkImageLayout layout     // them in Go
 }
 
 class VkSubpassDescription {

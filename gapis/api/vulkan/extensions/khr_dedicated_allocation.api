@@ -49,7 +49,7 @@ class VkMemoryDedicatedRequirementsKHR {
 }
 
 @extension("VK_KHR_dedicated_allocation")
-class VkMemoryDedicatedAllocationInfoKHR {
+class VkMemoryDedicatedAllocateInfoKHR {
   VkStructureType sType
   const void*     pNext
   VkImage         image

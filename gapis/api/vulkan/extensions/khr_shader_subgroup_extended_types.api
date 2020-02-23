@@ -47,6 +47,7 @@ class VkPhysicalDeviceShaderSubgroupExtendedTypesFeaturesKHR {
 }
 
 @extension("VK_KHR_shader_subgroup_extended_types")
+@internal
 class PhysicalDeviceShaderSubgroupExtendedTypesFeaturesKHR {
     VkBool32           ShaderSubgroupExtendedTypes
 }

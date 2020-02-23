@@ -48,6 +48,7 @@ class VkPhysicalDeviceShaderAtomicInt64FeaturesKHR {
 }
 
 @extension("VK_KHR_shader_atomic_int64")
+@internal
 class PhysicalDeviceShaderAtomicInt64FeaturesKHR {
     VkBool32           ShaderBufferInt64Atomics
     VkBool32           ShaderSharedInt64Atomics

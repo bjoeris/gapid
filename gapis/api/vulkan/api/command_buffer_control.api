@@ -117,7 +117,7 @@ cmd VkResult vkResetCommandPool(
 // Command buffer //
 ////////////////////
 
-enum RecordingState {
+@internal enum RecordingState {
   NOT_STARTED  = 0,
   RECORDING    = 1,
   COMPLETED    = 2,
@@ -140,7 +140,7 @@ enum RecordingState {
   ref!DeviceGroupBegin          DeviceGroupBegin
 }
 
-enum CommandType {
+@internal enum CommandType {
   cmd_vkCmdBindPipeline                  = 0,
   cmd_vkCmdSetViewport                   = 1,
   cmd_vkCmdSetScissor                    = 2,
@@ -202,7 +202,7 @@ enum CommandType {
   cmd_vkNoCommand                        = 0xFFFFFFFF
 }
 
-enum SemaphoreUpdate {
+@internal enum SemaphoreUpdate {
   None     = 0,
   Unsignal = 1,
   Signal   = 2

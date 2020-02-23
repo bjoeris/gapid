@@ -106,7 +106,7 @@ cmd VkResult vkAllocateMemory(
           )
         }
         case VK_STRUCTURE_TYPE_MEMORY_DEDICATED_ALLOCATE_INFO_KHR: {
-          ext := as!VkMemoryDedicatedAllocationInfoKHR*(next.Ptr)[0:1][0]
+          ext := as!VkMemoryDedicatedAllocateInfoKHR*(next.Ptr)[0:1][0]
           memoryObject.DedicatedAllocationKHR = new!MemoryDedicatedAllocationInfo(
             Image:   ext.image,
             Buffer:  ext.buffer,
