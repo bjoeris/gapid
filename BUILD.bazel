@@ -167,6 +167,7 @@ copy_to(
         "//cmd/gapir/cc:gapir",
         "//cmd/gapis",
         "//cmd/gapit",
+        "//cmd/apic",
         "//tools/build:build.properties",
         "//cmd/device-info:device-info",
     ] + select({

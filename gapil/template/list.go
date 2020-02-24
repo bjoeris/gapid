@@ -191,3 +191,12 @@ func (f *Functions) Length(arr interface{}) (int, error) {
 	v := reflect.ValueOf(arr)
 	return v.Len(), nil
 }
+
+func (f *Functions) Range(count interface{}) (interface{}, error) {
+	n := int(reflect.ValueOf(count).Convert(reflect.TypeOf(0)).Int())
+	slice := reflect.MakeSlice(reflect.TypeOf([]int{}), n, n)
+	for i := 0; i<n; i++ {
+		slice.Index(i).Set(reflect.ValueOf(i))
+	}
+	return slice.Interface(), nil
+}

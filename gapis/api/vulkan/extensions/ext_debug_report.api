@@ -87,12 +87,12 @@ enum VkDebugReportObjectTypeEXT: u32{
   VK_DEBUG_REPORT_OBJECT_TYPE_DEBUG_REPORT_EXT          = 28,
 }
 
-@extension("VK_EXT_debug_report")
-@unused
-enum VkDebugReportErrorEXT: u32 {
-  VK_DEBUG_REPORT_ERROR_NONE_EXT         = 0,
-  VK_DEBUG_REPORT_ERROR_CALLBACK_REF_EXT = 1,
-}
+// @extension("VK_EXT_debug_report")
+// @unused
+// enum VkDebugReportErrorEXT: u32 {
+//   VK_DEBUG_REPORT_ERROR_NONE_EXT         = 0,
+//   VK_DEBUG_REPORT_ERROR_CALLBACK_REF_EXT = 1,
+// }
 
 ///////////////
 // Bitfields //

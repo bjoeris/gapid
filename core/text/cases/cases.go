@@ -41,16 +41,16 @@ func Pascal(s string) Words {
 	out := Words{}
 	buf := bytes.Buffer{}
 	wasUpper := true
-	wasNumber := true
+	wasNumber2 := true
 	for _, r := range []rune(s) {
-		if (!wasUpper && unicode.IsUpper(r)) || (!wasNumber && unicode.IsNumber(r)) {
+		if (!wasUpper && unicode.IsUpper(r)) || (!wasNumber2 && unicode.IsNumber(r)) {
 			// Start of new word. Flush buf.
 			out = append(out, buf.String())
 			buf.Reset()
 		}
 		buf.WriteRune(r)
 		wasUpper = unicode.IsUpper(r)
-		wasNumber = unicode.IsNumber(r)
+		wasNumber2 = unicode.IsNumber(r)
 	}
 	if buf.Len() > 0 {
 		out = append(out, buf.String())

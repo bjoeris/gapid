@@ -1038,11 +1038,11 @@ class VkBufferImageCopy {
 // TODO: We can't use unions of StaticArrays - it has a copy-constructor
 // bclayton: Instead of this, I'd recommend using a void* and casting to
 //           the wanted type in the cmd.
-// @union
+@union("uint32")
 /// Union allowing specification of floating point, integer, or unsigned integer color data. Actual value selected is based on image/attachment being cleared.
 class VkClearColorValue {
-  //f32[4]                                      float32
-  //s32[4]                                      int32
+  f32[4]                                      float32
+  s32[4]                                      int32
   u32[4] uint32
 }
 
@@ -1054,11 +1054,11 @@ class VkClearDepthStencilValue {
 // TODO: We can't use unions of StaticArrays - it has a copy-constructor
 // bclayton: Instead of this, I'd recommend using a void* and casting to
 //           the wanted type in the cmd.
-// @union
+@union("color")
 /// Union allowing specification of color, depth, and stencil color values. Actual value selected is based on attachment being cleared.
 class VkClearValue {
   VkClearColorValue        color
-  // VkClearDepthStencilValue depthStencil
+  VkClearDepthStencilValue depthStencil
 }
 
 class VkClearAttachment {

@@ -55,7 +55,9 @@
   @unused ref!PhysicalDevicePCIBusInfoPropertiesEXT PhysicalDevicePCIBusInfoPropertiesEXT
   @unused ref!PhysicalDeviceShaderCorePropertiesAMD PhysicalDeviceShaderCorePropertiesAMD
   @unused ref!PhysicalDeviceFloatControlsPropertiesKHR PhysicalDeviceFloatControlsPropertiesKHR
-  @unused ref!PhysicalDeviceDriverPropertiesKHR PhysicalDeviceDriverPropertiesKHR
+
+  // Vulkan 1.2 core
+  @unused ref!PhysicalDeviceDriverProperties PhysicalDeviceDriverProperties
 }
 
 @internal class PhysicalDevicesAndProperties {

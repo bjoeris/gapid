@@ -42,44 +42,55 @@
 define VK_MAX_DRIVER_NAME_SIZE_KHR         256 /// Vulkan 1.1
 define VK_MAX_DRIVER_INFO_SIZE_KHR         256 /// Vulkan 1.1
 
-@extension("VK_KHR_driver_properties")
-enum VkDriverIdKHR {
-    VK_DRIVER_ID_AMD_PROPRIETARY_KHR = 1,
-    VK_DRIVER_ID_AMD_OPEN_SOURCE_KHR = 2,
-    VK_DRIVER_ID_MESA_RADV_KHR = 3,
-    VK_DRIVER_ID_NVIDIA_PROPRIETARY_KHR = 4,
-    VK_DRIVER_ID_INTEL_PROPRIETARY_WINDOWS_KHR = 5,
-    VK_DRIVER_ID_INTEL_OPEN_SOURCE_MESA_KHR = 6,
-    VK_DRIVER_ID_IMAGINATION_PROPRIETARY_KHR = 7,
-    VK_DRIVER_ID_QUALCOMM_PROPRIETARY_KHR = 8,
-    VK_DRIVER_ID_ARM_PROPRIETARY_KHR = 9,
-    VK_DRIVER_ID_GOOGLE_SWIFTSHADER_KHR = 10,
-    VK_DRIVER_ID_GGP_PROPRIETARY_KHR = 11,
-    VK_DRIVER_ID_BROADCOM_PROPRIETARY_KHR = 12,
-    VK_DRIVER_ID_MAX_ENUM_KHR = 0x7FFFFFFF
+define VK_MAX_DRIVER_NAME_SIZE         256 /// Vulkan 1.1
+define VK_MAX_DRIVER_INFO_SIZE         256 /// Vulkan 1.1
+
+
+enum VkDriverId {
+    VK_DRIVER_ID_AMD_PROPRIETARY = 1,
+    VK_DRIVER_ID_AMD_OPEN_SOURCE = 2,
+    VK_DRIVER_ID_MESA_RADV = 3,
+    VK_DRIVER_ID_NVIDIA_PROPRIETARY = 4,
+    VK_DRIVER_ID_INTEL_PROPRIETARY_WINDOWS = 5,
+    VK_DRIVER_ID_INTEL_OPEN_SOURCE_MESA = 6,
+    VK_DRIVER_ID_IMAGINATION_PROPRIETARY = 7,
+    VK_DRIVER_ID_QUALCOMM_PROPRIETARY = 8,
+    VK_DRIVER_ID_ARM_PROPRIETARY = 9,
+    VK_DRIVER_ID_GOOGLE_SWIFTSHADER = 10,
+    VK_DRIVER_ID_GGP_PROPRIETARY = 11,
+    VK_DRIVER_ID_BROADCOM_PROPRIETARY = 12,
+    VK_DRIVER_ID_MAX_ENUM = 0x7FFFFFFF
 }
 
 @extension("VK_KHR_driver_properties")
-class VkPhysicalDeviceDriverPropertiesKHR {
+type VkDriverId VkDriverIdKHR
+
+class VkPhysicalDeviceDriverProperties {
     VkStructureType                      sType
     void*                                pNext
-    VkDriverIdKHR                        driverID
-    char[VK_MAX_DRIVER_NAME_SIZE_KHR]    driverName
-    char[VK_MAX_DRIVER_INFO_SIZE_KHR]    driverInfo
-    VkConformanceVersionKHR              conformanceVersion
+    VkDriverId                           driverID
+    char[VK_MAX_DRIVER_NAME_SIZE]        driverName
+    char[VK_MAX_DRIVER_INFO_SIZE]        driverInfo
+    VkConformanceVersion                 conformanceVersion
 }
 
 @extension("VK_KHR_driver_properties")
-class VkConformanceVersionKHR {
+type VkPhysicalDeviceDriverProperties VkPhysicalDeviceDriverPropertiesKHR
+
+class VkConformanceVersion {
     u8    major
     u8    minor
     u8    subminor
     u8    patch
 }
 
-class PhysicalDeviceDriverPropertiesKHR {
-    VkDriverIdKHR                              DriverID
-    char[VK_MAX_DRIVER_NAME_SIZE_KHR]          DriverName
-    char[VK_MAX_DRIVER_INFO_SIZE_KHR]          DriverInfo
-    VkConformanceVersionKHR                    ConformanceVersion
+@extension("VK_KHR_driver_properties")
+type VkConformanceVersion VkConformanceVersionKHR
+
+@internal
+class PhysicalDeviceDriverProperties {
+    VkDriverId                              DriverID
+    char[VK_MAX_DRIVER_NAME_SIZE]           DriverName
+    char[VK_MAX_DRIVER_INFO_SIZE]           DriverInfo
+    VkConformanceVersion                    ConformanceVersion
 }

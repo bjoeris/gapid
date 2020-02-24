@@ -101,9 +101,15 @@
       {{Template "DeclareType" (TypeOf $f)}}
     {{end}}
 
-    typedef {{if GetAnnotation $ "union"}}union{{else}}struct{{end}} {
-      {{range $f := $.Fields}}
-        {{Template "C++.Type" $f}} {{$f.Name}};
+    typedef struct {
+      {{if GetAnnotation $ "union"}}
+      union {
+      {{end}}
+        {{range $f := $.Fields}}
+          {{Template "C++.Type" $f}} {{$f.Name}};
+        {{end}}
+      {{if GetAnnotation $ "union"}}
+      };
       {{end}}
     } {{Template "C++.Type" $}};¶
   {{end}}

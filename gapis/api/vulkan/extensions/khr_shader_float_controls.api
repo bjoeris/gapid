@@ -39,13 +39,15 @@
 @extension("VK_KHR_shader_float_controls") define VK_KHR_SHADER_FLOAT_CONTROLS_SPEC_VERSION   1
 @extension("VK_KHR_shader_float_controls") define VK_KHR_SHADER_FLOAT_CONTROLS_EXTENSION_NAME "VK_KHR_shader_float_controls"
 
-@extension("VK_KHR_shader_float_controls")
-enum VkShaderFloatControlsIndependenceKHR : u32 {
-    VK_SHADER_FLOAT_CONTROLS_INDEPENDENCE_32_BIT_ONLY_KHR = 0,
-    VK_SHADER_FLOAT_CONTROLS_INDEPENDENCE_ALL_KHR = 1,
-    VK_SHADER_FLOAT_CONTROLS_INDEPENDENCE_NONE_KHR = 2,
-    VK_SHADER_FLOAT_CONTROLS_INDEPENDENCE_MAX_ENUM_KHR = 0x7FFFFFFF
+enum VkShaderFloatControlsIndependence : u32 {
+    VK_SHADER_FLOAT_CONTROLS_INDEPENDENCE_32_BIT_ONLY = 0,
+    VK_SHADER_FLOAT_CONTROLS_INDEPENDENCE_ALL = 1,
+    VK_SHADER_FLOAT_CONTROLS_INDEPENDENCE_NONE = 2,
+    VK_SHADER_FLOAT_CONTROLS_INDEPENDENCE_MAX_ENUM = 0x7FFFFFFF
 }
+
+@extension("VK_KHR_shader_float_controls")
+type VkShaderFloatControlsIndependence VkShaderFloatControlsIndependenceKHR
 
 @extension("VK_KHR_shader_float_controls")
 class VkPhysicalDeviceFloatControlsPropertiesKHR {

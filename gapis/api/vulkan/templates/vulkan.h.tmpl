@@ -279,8 +279,14 @@ VK_EXT_debug_report
   {{AssertType $ "Class"}}
   {{if (Macro "IsSupported" $)}}
     {{Macro "Docs" $.Docs}}
-    typedef {{Macro "StructType" $}} {
+    typedef struct {
+      {{if GetAnnotation $ "union"}}
+      union {
+      {{end}}
       {{ForEach $.Fields "Field" | JoinWith "\n"}}
+      {{if GetAnnotation $ "union"}}
+      };
+      {{end}}
     } {{Macro "StructName" $}};
   {{end}}
   ¶
