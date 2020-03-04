@@ -71,43 +71,43 @@ void VulkanSpy::recordExternalBarriers(
   }
 }
 
-ExternalMemoryStaging::ExternalMemoryStaging(
-    VulkanSpy* spy, CallObserver* observer, VkQueue queue, uint32_t submitCount,
-    const VkSubmitInfo* pSubmits, VkFence fence)
-    : spy(spy), observer(observer), queue(queue), origFence(fence) {
+std::atomic<uint64_t> ExternalMemoryStaging::nextObservationID(1);
+
+ExternalMemoryStaging::ExternalMemoryStaging(VulkanSpy* spy, VkQueue queue,
+                                             VkSubmitInfo& submission)
+    : spy(spy), queue(queue), observationID(nextObservationID.fetch_add(1)) {
   QueueObject& queueObj = *spy->mState.Queues[queue];
   queueFamilyIndex = queueObj.mFamily;
   device = queueObj.mDevice;
   fn = &spy->mImports.mVkDeviceFunctions[device];
 
   stagingSize = 0;
-  submits.resize(submitCount);
-  for (uint32_t i = 0; i < submitCount; ++i) {
-    submits[i].submitInfo = &pSubmits[i];
-    uint32_t commandBufferCount = pSubmits[i].mcommandBufferCount;
-    submits[i].commandBuffers.resize(commandBufferCount);
-    for (uint32_t j = 0; j < commandBufferCount; ++j) {
-      ExternalMemoryCommandBuffer& cmdBuf = submits[i].commandBuffers[j];
-      cmdBuf.commandBuffer = pSubmits[i].mpCommandBuffers[j];
-      auto bufIt = spy->mExternalBufferBarriers.find(cmdBuf.commandBuffer);
-      if (bufIt != spy->mExternalBufferBarriers.end()) {
-        for (const auto& barrier : bufIt->second) {
-          cmdBuf.buffers.push_back(
-              ExternalBufferMemoryStaging(barrier, stagingSize));
-        }
-      }
-
-      auto imgIt = spy->mExternalImageBarriers.find(cmdBuf.commandBuffer);
-      if (imgIt != spy->mExternalImageBarriers.end()) {
-        for (const auto& barrier : imgIt->second) {
-          ExternalImageMemoryStaging imgStaging(barrier);
-          imgStaging.copies =
-              spy->BufferImageCopies(spy->mState.Images[barrier.mimage],
-                                     barrier.msubresourceRange, stagingSize);
-          cmdBuf.images.push_back(std::move(imgStaging));
-        }
+  uint32_t commandBufferCount = submission.mcommandBufferCount;
+  commandBuffers.reserve(commandBufferCount + 1);
+  commandBuffers.push_back(VkCommandBuffer(0));
+  for (uint32_t j = 0; j < commandBufferCount; ++j) {
+    VkCommandBuffer cmdBuf = submission.mpCommandBuffers[j];
+    commandBuffers.push_back(cmdBuf);
+    auto bufIt = spy->mExternalBufferBarriers.find(cmdBuf);
+    if (bufIt != spy->mExternalBufferBarriers.end()) {
+      for (const auto& barrier : bufIt->second) {
+        buffers.push_back(ExternalBufferMemoryStaging(barrier, stagingSize));
       }
     }
+    auto imgIt = spy->mExternalImageBarriers.find(cmdBuf);
+    if (imgIt != spy->mExternalImageBarriers.end()) {
+      for (const auto& barrier : imgIt->second) {
+        ExternalImageMemoryStaging imgStaging(barrier);
+        imgStaging.copies =
+            spy->BufferImageCopies(spy->mState.Images[barrier.mimage],
+                                   barrier.msubresourceRange, stagingSize);
+        images.push_back(std::move(imgStaging));
+      }
+    }
+  }
+  if ((!buffers.empty()) || (!images.empty())) {
+    submission.mcommandBufferCount = (uint32_t)commandBuffers.size();
+    submission.mpCommandBuffers = commandBuffers.data();
   }
 }
 
@@ -127,56 +127,34 @@ uint32_t ExternalMemoryStaging::CreateResources() {
     return res;
   }
 
-  VkFenceCreateInfo fenceCreateInfo{
-      VkStructureType::VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,  // sType
+  VkEventCreateInfo eventCreateInfo{
+      VkStructureType::VK_STRUCTURE_TYPE_EVENT_CREATE_INFO,  // sType
       nullptr,                                               // pNext
       0,                                                     // flags
   };
-  res = fn->vkCreateFence(device, &fenceCreateInfo, nullptr, &stagingFence);
+  res = fn->vkCreateEvent(device, &eventCreateInfo, nullptr, &stagingEvent);
   if (res != VkResult::VK_SUCCESS) {
-    stagingFence = 0;
-    GAPID_ERROR("Error creating fence for external memory observations");
+    stagingEvent = 0;
+    GAPID_ERROR("Error creating event for external memory observations");
     return res;
   }
 
-  size_t commandBufferCount = 1;
-  for (auto submitIt = submits.begin(); submitIt != submits.end(); ++submitIt) {
-    for (auto cmdBufIt = submitIt->commandBuffers.begin();
-         cmdBufIt != submitIt->commandBuffers.end(); ++cmdBufIt) {
-      if (!cmdBufIt->empty()) {
-        ++commandBufferCount;
-      }
-    }
-  }
-  std::vector<VkCommandBuffer> commandBuffers(commandBufferCount);
   VkCommandBufferAllocateInfo commandBufferAllocInfo{
       VkStructureType::VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,  // sType
       nullptr,                                                          // pNext
       stagingCommandPool,                                     // commandPool
       VkCommandBufferLevel::VK_COMMAND_BUFFER_LEVEL_PRIMARY,  // level
-      (uint32_t)commandBuffers.size() + 1,  // commandBufferCount
+      1,  // commandBufferCount
   };
   res = fn->vkAllocateCommandBuffers(device, &commandBufferAllocInfo,
-                                     commandBuffers.data());
-  for (auto cmdBuf : commandBuffers) {
-    set_dispatch_from_parent((void*)cmdBuf, (void*)device);
-  }
+                                     &stagingCommandBuffer);
   if (res != VkResult::VK_SUCCESS) {
     GAPID_ERROR(
         "Error allocating command buffer for external memory observations");
     return res;
   }
-  stagingCommandBuffer = commandBuffers.back();
-  commandBuffers.pop_back();
-  for (auto submitIt = submits.begin(); submitIt != submits.end(); ++submitIt) {
-    for (auto cmdBufIt = submitIt->commandBuffers.begin();
-         cmdBufIt != submitIt->commandBuffers.end(); ++cmdBufIt) {
-      if (!cmdBufIt->empty()) {
-        cmdBufIt->stagingCommandBuffer = commandBuffers.back();
-        commandBuffers.pop_back();
-      }
-    }
-  }
+  set_dispatch_from_parent((void*)stagingCommandBuffer, (void*)device);
+  commandBuffers[0] = stagingCommandBuffer;
 
   VkBufferCreateInfo bufferCreateInfo = {
       VkStructureType::VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,    // sType
@@ -236,18 +214,6 @@ uint32_t ExternalMemoryStaging::CreateResources() {
 }
 
 uint32_t ExternalMemoryStaging::RecordCommandBuffers() {
-  for (auto submitIt = submits.begin(); submitIt != submits.end(); ++submitIt) {
-    for (auto cmdBufIt = submitIt->commandBuffers.begin();
-         cmdBufIt != submitIt->commandBuffers.end(); ++cmdBufIt) {
-      if (!cmdBufIt->empty()) {
-        uint32_t res = RecordStagingCommandBuffer(*cmdBufIt);
-        if (res != VkResult::VK_SUCCESS) {
-          return res;
-        }
-      }
-    }
-  }
-
   VkCommandBufferBeginInfo beginInfo{
       VkStructureType::VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,  // sType
       nullptr,                                                       // pNext
@@ -260,6 +226,92 @@ uint32_t ExternalMemoryStaging::RecordCommandBuffers() {
     GAPID_ERROR("Failed at begin command buffer to read external memory");
     return res;
   }
+
+  std::vector<VkBufferMemoryBarrier> acquireBufferBarriers;
+  acquireBufferBarriers.reserve(buffers.size());
+  std::vector<VkBufferMemoryBarrier> releaseBufferBarriers;
+  releaseBufferBarriers.reserve(buffers.size());
+
+  std::vector<VkImageMemoryBarrier> acquireImageBarriers;
+  acquireImageBarriers.reserve(images.size());
+  std::vector<VkImageMemoryBarrier> releaseImageBarriers;
+  releaseImageBarriers.reserve(images.size());
+
+  for (const auto& bufStaging : buffers) {
+    VkBufferMemoryBarrier barrier = bufStaging.barrier;
+    barrier.msrcAccessMask = 0;
+    barrier.mdstAccessMask = VkAccessFlagBits::VK_ACCESS_TRANSFER_READ_BIT;
+    acquireBufferBarriers.push_back(barrier);
+    std::swap(barrier.msrcAccessMask, barrier.mdstAccessMask);
+    std::swap(barrier.msrcQueueFamilyIndex, barrier.mdstQueueFamilyIndex);
+    releaseBufferBarriers.push_back(barrier);
+  }
+
+  for (const auto& imgStaging : images) {
+    VkImageMemoryBarrier barrier = imgStaging.barrier;
+    barrier.msrcAccessMask = 0;
+    barrier.mdstAccessMask = VkAccessFlagBits::VK_ACCESS_TRANSFER_READ_BIT;
+    barrier.mnewLayout = VkImageLayout::VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+    acquireImageBarriers.push_back(barrier);
+
+    std::swap(barrier.msrcAccessMask, barrier.mdstAccessMask);
+    std::swap(barrier.msrcQueueFamilyIndex, barrier.mdstQueueFamilyIndex);
+    std::swap(barrier.moldLayout, barrier.mnewLayout);
+    releaseImageBarriers.push_back(barrier);
+  }
+
+  // acquire from external queue family
+  fn->vkCmdPipelineBarrier(
+      stagingCommandBuffer,  // commandBuffer
+      VkPipelineStageFlagBits::
+          VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,                   // srcStageMask
+      VkPipelineStageFlagBits::VK_PIPELINE_STAGE_TRANSFER_BIT,  // dstStageMask
+      0,                                       // dependencyFlags
+      0,                                       // memoryBarrierCount
+      nullptr,                                 // pMemoryBarriers
+      (uint32_t)acquireBufferBarriers.size(),  // bufferMemoryBarrierCount
+      acquireBufferBarriers.data(),            // pBufferMemoryBarriers
+      (uint32_t)acquireImageBarriers.size(),   // imageMemoryBarrierCount
+      acquireImageBarriers.data()              // pImageMemoryBarriers
+  );
+
+  // copy external buffer barrier regions to staging buffer
+  for (const auto& bufStaging : buffers) {
+    fn->vkCmdCopyBuffer(stagingCommandBuffer,  // commandBuffer
+                        bufStaging.buffer,     // srcBuffer
+                        stagingBuffer,         // dstBuffer
+                        1,                     // regionCount
+                        &bufStaging.copy       // pRegions
+    );
+  }
+
+  // copy external image barrier regions to staging buffer
+  for (const auto& imgStaging : images) {
+    fn->vkCmdCopyImageToBuffer(
+        stagingCommandBuffer,                                 // commandBuffer
+        imgStaging.image,                                     // srcImage
+        VkImageLayout::VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,  // srcImageLayout
+        stagingBuffer,                                        // dstBuffer
+        (uint32_t)imgStaging.copies.size(),                   // regionCount
+        imgStaging.copies.data()                              // pRegions
+    );
+  }
+
+  // release external barrier regions back to external queue family
+  // (so that the original barriers run correctly when they execute later)
+  fn->vkCmdPipelineBarrier(
+      stagingCommandBuffer,                                     // commandBuffer
+      VkPipelineStageFlagBits::VK_PIPELINE_STAGE_TRANSFER_BIT,  // srcStageMask
+      VkPipelineStageFlagBits::
+          VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,  // dstStageMask
+      0,                                       // dependencyFlags
+      0,                                       // memoryBarrierCount
+      nullptr,                                 // pMemoryBarriers
+      (uint32_t)releaseBufferBarriers.size(),  // bufferMemoryBarrierCount
+      releaseBufferBarriers.data(),            // pBufferMemoryBarriers
+      (uint32_t)releaseImageBarriers.size(),   // imageMemoryBarrierCount
+      releaseImageBarriers.data()              // pImageMemoryBarriers
+  );
 
   // Make staging buffer writes visible to the host
   VkBufferMemoryBarrier barrier{
@@ -287,6 +339,10 @@ uint32_t ExternalMemoryStaging::RecordCommandBuffers() {
       nullptr    // pImageMemoryBarriers
   );
 
+  fn->vkCmdSetEvent(
+      stagingCommandBuffer, stagingEvent,
+      VkPipelineStageFlagBits::VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT);
+
   res = fn->vkEndCommandBuffer(stagingCommandBuffer);
   if (res != VkResult::VK_SUCCESS) {
     GAPID_ERROR("Failed at end command buffer to read external memory");
@@ -295,172 +351,55 @@ uint32_t ExternalMemoryStaging::RecordCommandBuffers() {
   return VkResult::VK_SUCCESS;
 }
 
-uint32_t ExternalMemoryStaging::RecordStagingCommandBuffer(
-    const ExternalMemoryCommandBuffer& cmdBuf) {
-  VkCommandBufferBeginInfo beginInfo{
-      VkStructureType::VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,  // sType
-      nullptr,                                                       // pNext
-      VkCommandBufferUsageFlagBits::
-          VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,  // flags
-      nullptr,                                          // pInheritanceInfo
-  };
-  uint32_t res =
-      fn->vkBeginCommandBuffer(cmdBuf.stagingCommandBuffer, &beginInfo);
-  if (res != VkResult::VK_SUCCESS) {
-    GAPID_ERROR("Failed at begin command buffer to read external memory");
-    return res;
+// This sends the metadata for the external memory (size, offsets of resources),
+// but does *not* send the contents of the staging buffer, because the copy into
+// the staging buffer might not be executed yet.
+void ExternalMemoryStaging::SendExtra(uint32_t submitIndex,
+                                      CallObserver* observer) {
+  auto extra = new vulkan_pb::ExternalMemoryObservation();
+  extra->set_observation_id(observationID);
+  extra->set_resource_size(stagingSize);
+  extra->set_submit_index(submitIndex);
+  for (auto bufStaging : buffers) {
+    auto bufMsg = extra->add_buffers();
+    bufMsg->set_buffer(bufStaging.buffer);
+    bufMsg->set_buffer_offset(bufStaging.copy.msrcOffset);
+    bufMsg->set_data_offset(bufStaging.copy.mdstOffset);
+    bufMsg->set_size(bufStaging.copy.msize);
   }
-
-  std::vector<VkBufferMemoryBarrier> acquireBufferBarriers;
-  acquireBufferBarriers.reserve(cmdBuf.buffers.size());
-  std::vector<VkBufferMemoryBarrier> releaseBufferBarriers;
-  releaseBufferBarriers.reserve(cmdBuf.buffers.size());
-
-  std::vector<VkImageMemoryBarrier> acquireImageBarriers;
-  acquireImageBarriers.reserve(cmdBuf.images.size());
-  std::vector<VkImageMemoryBarrier> releaseImageBarriers;
-  releaseImageBarriers.reserve(cmdBuf.images.size());
-  for (const auto& bufStaging : cmdBuf.buffers) {
-    VkBufferMemoryBarrier barrier = bufStaging.barrier;
-    barrier.msrcAccessMask = 0;
-    barrier.mdstAccessMask = VkAccessFlagBits::VK_ACCESS_TRANSFER_READ_BIT;
-    acquireBufferBarriers.push_back(barrier);
-    std::swap(barrier.msrcAccessMask, barrier.mdstAccessMask);
-    std::swap(barrier.msrcQueueFamilyIndex, barrier.mdstQueueFamilyIndex);
-    releaseBufferBarriers.push_back(barrier);
-  }
-
-  for (const auto& imgStaging : cmdBuf.images) {
-    VkImageMemoryBarrier barrier = imgStaging.barrier;
-    barrier.msrcAccessMask = 0;
-    barrier.mdstAccessMask = VkAccessFlagBits::VK_ACCESS_TRANSFER_READ_BIT;
-    barrier.mnewLayout = VkImageLayout::VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-    acquireImageBarriers.push_back(barrier);
-
-    std::swap(barrier.msrcAccessMask, barrier.mdstAccessMask);
-    std::swap(barrier.msrcQueueFamilyIndex, barrier.mdstQueueFamilyIndex);
-    std::swap(barrier.moldLayout, barrier.mnewLayout);
-    releaseImageBarriers.push_back(barrier);
-  }
-
-  // acquire from external queue family
-  fn->vkCmdPipelineBarrier(
-      cmdBuf.stagingCommandBuffer,  // commandBuffer
-      VkPipelineStageFlagBits::
-          VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,                   // srcStageMask
-      VkPipelineStageFlagBits::VK_PIPELINE_STAGE_TRANSFER_BIT,  // dstStageMask
-      0,                                       // dependencyFlags
-      0,                                       // memoryBarrierCount
-      nullptr,                                 // pMemoryBarriers
-      (uint32_t)acquireBufferBarriers.size(),  // bufferMemoryBarrierCount
-      acquireBufferBarriers.data(),            // pBufferMemoryBarriers
-      (uint32_t)acquireImageBarriers.size(),   // imageMemoryBarrierCount
-      acquireImageBarriers.data()              // pImageMemoryBarriers
-  );
-
-  // copy external buffer barrier regions to staging buffer
-  for (const auto& bufStaging : cmdBuf.buffers) {
-    fn->vkCmdCopyBuffer(cmdBuf.stagingCommandBuffer,  // commandBuffer
-                        bufStaging.buffer,            // srcBuffer
-                        stagingBuffer,                // dstBuffer
-                        1,                            // regionCount
-                        &bufStaging.copy              // pRegions
-    );
-  }
-
-  // copy external image barrier regions to staging buffer
-  for (const auto& imgStaging : cmdBuf.images) {
-    fn->vkCmdCopyImageToBuffer(
-        cmdBuf.stagingCommandBuffer,                          // commandBuffer
-        imgStaging.image,                                     // srcImage
-        VkImageLayout::VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,  // srcImageLayout
-        stagingBuffer,                                        // dstBuffer
-        (uint32_t)imgStaging.copies.size(),                   // regionCount
-        imgStaging.copies.data()                              // pRegions
-    );
-  }
-
-  // release external barrier regions back to external queue family
-  // (so that the original barriers run correctly when they execute later)
-  fn->vkCmdPipelineBarrier(
-      cmdBuf.stagingCommandBuffer,                              // commandBuffer
-      VkPipelineStageFlagBits::VK_PIPELINE_STAGE_TRANSFER_BIT,  // srcStageMask
-      VkPipelineStageFlagBits::
-          VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,  // dstStageMask
-      0,                                       // dependencyFlags
-      0,                                       // memoryBarrierCount
-      nullptr,                                 // pMemoryBarriers
-      (uint32_t)releaseBufferBarriers.size(),  // bufferMemoryBarrierCount
-      releaseBufferBarriers.data(),            // pBufferMemoryBarriers
-      (uint32_t)releaseImageBarriers.size(),   // imageMemoryBarrierCount
-      releaseImageBarriers.data()              // pImageMemoryBarriers
-  );
-
-  res = fn->vkEndCommandBuffer(cmdBuf.stagingCommandBuffer);
-  if (res != VkResult::VK_SUCCESS) {
-    GAPID_ERROR("Failed at end command buffer to read external memory");
-    return res;
-  }
-
-  return VkResult::VK_SUCCESS;
-}
-
-uint32_t ExternalMemoryStaging::Submit() {
-  std::vector<std::vector<VkCommandBuffer>> commandBuffers;
-  std::vector<VkSubmitInfo> submitInfos;
-  for (auto submitIt = submits.begin(); submitIt != submits.end(); ++submitIt) {
-    commandBuffers.push_back({});
-    std::vector<VkCommandBuffer>& submitCmds = commandBuffers.back();
-    for (auto cmdBufIt = submitIt->commandBuffers.begin();
-         cmdBufIt != submitIt->commandBuffers.end(); ++cmdBufIt) {
-      if (!cmdBufIt->empty()) {
-        submitCmds.push_back(cmdBufIt->stagingCommandBuffer);
-      }
-      submitCmds.push_back(cmdBufIt->commandBuffer);
-    }
-    submitInfos.push_back(*submitIt->submitInfo);
-    submitInfos.back().mcommandBufferCount = (uint32_t)submitCmds.size();
-    submitInfos.back().mpCommandBuffers = submitCmds.data();
-  }
-  submitInfos.push_back({
-      VkStructureType::VK_STRUCTURE_TYPE_SUBMIT_INFO,  // sType
-      nullptr,                                         // pNext
-      0,                                               // waitSemaphoreCount
-      nullptr,                                         // pWaitSemaphores
-      nullptr,                                         // pWaitDstStageMask
-      1,                                               // commandBufferCount
-      &stagingCommandBuffer,                           // pCommandBuffers
-      0,                                               // signalSemaphoreCount
-      nullptr,                                         // pSignalSemaphores
-  });
-  uint32_t res = fn->vkQueueSubmit(queue, submitInfos.size(),
-                                   submitInfos.data(), stagingFence);
-  if (res != VkResult::VK_SUCCESS) {
-    return res;
-  }
-  if (origFence != 0) {
-    res = fn->vkQueueSubmit(queue, 0, nullptr, origFence);
-    if (res != VkResult::VK_SUCCESS) {
-      GAPID_ERROR(
-          "Error submitting original fence after external memory observations");
-      return res;
+  for (const auto& imgStaging : images) {
+    auto imgMsg = extra->add_images();
+    imgMsg->set_image(imgStaging.image);
+    const VkImageSubresourceRange& barrierRng =
+        imgStaging.barrier.msubresourceRange;
+    imgMsg->set_aspect_mask(barrierRng.maspectMask);
+    imgMsg->set_base_mip_level(barrierRng.mbaseMipLevel);
+    imgMsg->set_level_count(barrierRng.mlevelCount);
+    imgMsg->set_base_array_layer(barrierRng.mbaseArrayLayer);
+    imgMsg->set_layer_count(barrierRng.mlayerCount);
+    imgMsg->set_old_layout(imgStaging.barrier.moldLayout);
+    imgMsg->set_new_layout(imgStaging.barrier.mnewLayout);
+    for (const auto& copy : imgStaging.copies) {
+      auto copyMsg = imgMsg->add_ranges();
+      copyMsg->set_data_offset(copy.mbufferOffset);
+      const VkImageSubresourceLayers& copyRng = copy.mimageSubresource;
+      copyMsg->set_aspect_mask(copyRng.maspectMask);
+      copyMsg->set_mip_level(copyRng.mmipLevel);
+      copyMsg->set_base_array_layer(copyRng.mbaseArrayLayer);
+      copyMsg->set_layer_count(copyRng.mlayerCount);
     }
   }
-  return VkResult::VK_SUCCESS;
+  observer->encodeAndDelete(extra);
 }
 
-void ExternalMemoryStaging::SendData() {
-  uint32_t res = fn->vkWaitForFences(device, 1, &stagingFence, 0, UINT64_MAX);
-  if (res != VkResult::VK_SUCCESS) {
-    GAPID_ERROR("Error waiting for fence to save external memory observations");
-    return;
-  }
-
+// This sends the staging buffer contents for an external memory observation.
+// This observation may have been for an earlier command.
+void ExternalMemoryStaging::SendData(CallObserver* observer) {
   static const VkDeviceSize VK_WHOLE_SIZE = ~0ULL;
 
   uint8_t* data = nullptr;
-  res = fn->vkMapMemory(device, stagingMemory, 0, VK_WHOLE_SIZE, 0,
-                        (void**)&data);
+  uint32_t res = fn->vkMapMemory(device, stagingMemory, 0, VK_WHOLE_SIZE, 0,
+                                 (void**)&data);
   if (res != VkResult::VK_SUCCESS) {
     GAPID_ERROR("Failed at mapping staging memory to save external memory");
     return;
@@ -477,60 +416,21 @@ void ExternalMemoryStaging::SendData() {
       fn->vkInvalidateMappedMemoryRanges(device, 1, &range)) {
     GAPID_ERROR("Failed at invalidating mapped memory to save external memory");
   } else {
-    auto resIndex = spy->sendResource(VulkanSpy::kApiIndex, data, stagingSize);
-
+    auto resourceIndex =
+        spy->sendResource(VulkanSpy::kApiIndex, data, stagingSize);
     auto extra = new vulkan_pb::ExternalMemoryData();
-    extra->set_res_index(resIndex);
-    extra->set_res_size(stagingSize);
-    for (uint32_t submitIndex = 0; submitIndex < submits.size();
-         ++submitIndex) {
-      const ExternalMemorySubmitInfo& submit = submits[submitIndex];
-      for (uint32_t commandBufferIndex = 0;
-           commandBufferIndex < submit.commandBuffers.size();
-           ++commandBufferIndex) {
-        const ExternalMemoryCommandBuffer& cmdBuf =
-            submit.commandBuffers[commandBufferIndex];
-        for (auto bufStaging : cmdBuf.buffers) {
-          auto bufMsg = extra->add_buffers();
-          bufMsg->set_buffer(bufStaging.buffer);
-          bufMsg->set_buffer_offset(bufStaging.copy.msrcOffset);
-          bufMsg->set_data_offset(bufStaging.copy.mdstOffset);
-          bufMsg->set_size(bufStaging.copy.msize);
-          bufMsg->set_submit_index(submitIndex);
-          bufMsg->set_command_buffer_index(commandBufferIndex);
-        }
-        for (const auto& imgStaging : cmdBuf.images) {
-          auto imgMsg = extra->add_images();
-          imgMsg->set_image(imgStaging.image);
-          const VkImageSubresourceRange& barrierRng =
-              imgStaging.barrier.msubresourceRange;
-          imgMsg->set_aspect_mask(barrierRng.maspectMask);
-          imgMsg->set_base_mip_level(barrierRng.mbaseMipLevel);
-          imgMsg->set_level_count(barrierRng.mlevelCount);
-          imgMsg->set_base_array_layer(barrierRng.mbaseArrayLayer);
-          imgMsg->set_layer_count(barrierRng.mlayerCount);
-          imgMsg->set_old_layout(imgStaging.barrier.moldLayout);
-          imgMsg->set_new_layout(imgStaging.barrier.mnewLayout);
-          imgMsg->set_submit_index(submitIndex);
-          imgMsg->set_command_buffer_index(commandBufferIndex);
-
-          for (const auto& copy : imgStaging.copies) {
-            auto copyMsg = imgMsg->add_ranges();
-            copyMsg->set_data_offset(copy.mbufferOffset);
-            const VkImageSubresourceLayers& copyRng = copy.mimageSubresource;
-            copyMsg->set_aspect_mask(copyRng.maspectMask);
-            copyMsg->set_mip_level(copyRng.mmipLevel);
-            copyMsg->set_base_array_layer(copyRng.mbaseArrayLayer);
-            copyMsg->set_layer_count(copyRng.mlayerCount);
-          }
-        }
-      }
-    }
+    extra->set_resource_index(resourceIndex);
+    extra->set_observation_id(observationID);
     observer->encodeAndDelete(extra);
   }
-
   fn->vkUnmapMemory(device, stagingMemory);
 }
+
+bool ExternalMemoryStaging::IsReady() const {
+  return (fn->vkGetEventStatus(device, stagingEvent) == VkResult::VK_EVENT_SET);
+}
+
+bool ExternalMemoryStaging::IsBlocked() const { return false; }
 
 void ExternalMemoryStaging::Cleanup() {
   if (stagingCommandPool != 0) {
@@ -538,9 +438,9 @@ void ExternalMemoryStaging::Cleanup() {
     stagingCommandPool = 0;
   }
 
-  if (stagingFence != 0) {
-    fn->vkDestroyFence(device, stagingFence, nullptr);
-    stagingFence = 0;
+  if (stagingEvent != 0) {
+    fn->vkDestroyEvent(device, stagingEvent, nullptr);
+    stagingEvent = 0;
   }
 
   if (stagingBuffer != 0) {

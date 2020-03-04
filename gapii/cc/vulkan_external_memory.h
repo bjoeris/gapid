@@ -55,34 +55,38 @@ struct ExternalMemorySubmitInfo {
   std::vector<ExternalMemoryCommandBuffer> commandBuffers;
 };
 
+class VulkanSpy;
 struct ExternalMemoryStaging {
   VulkanSpy* spy = nullptr;
-  CallObserver* observer = nullptr;
   VkQueue queue = 0;
   uint32_t queueFamilyIndex = 0;
-  VkFence origFence = 0;
-  VkFence stagingFence = 0;
   VkDevice device = 0;
   const VulkanImports::VkDeviceFunctions* fn = nullptr;
 
-  std::vector<ExternalMemorySubmitInfo> submits;
+  std::vector<VkCommandBuffer> commandBuffers;
+  std::vector<ExternalBufferMemoryStaging> buffers;
+  std::vector<ExternalImageMemoryStaging> images;
 
   VkBuffer stagingBuffer = 0;
   VkDeviceMemory stagingMemory = 0;
   VkDeviceSize stagingSize = 0;
   VkCommandPool stagingCommandPool = 0;
   VkCommandBuffer stagingCommandBuffer = 0;
+  VkEvent stagingEvent = 0;
+  uint64_t observationID = 0;
+  static std::atomic<uint64_t> nextObservationID;
 
-  ExternalMemoryStaging(VulkanSpy* spy, CallObserver* observer, VkQueue queue,
-                        uint32_t submitCount, const VkSubmitInfo* pSubmits,
-                        VkFence fence);
-  inline ~ExternalMemoryStaging() { Cleanup(); }
+  ExternalMemoryStaging(VulkanSpy* spy, VkQueue queue,
+                        VkSubmitInfo& submission);
+  inline bool HasExternalMemoryObservations() const {
+    return !(buffers.empty() && images.empty());
+  }
   uint32_t CreateResources();
   uint32_t RecordCommandBuffers();
-  uint32_t RecordStagingCommandBuffer(
-      const ExternalMemoryCommandBuffer& cmdBuf);
-  uint32_t Submit();
-  void SendData();
+  void SendExtra(uint32_t submitIndex, CallObserver* observer);
+  void SendData(CallObserver* observer);
+  bool IsReady() const;
+  bool IsBlocked() const;
   void Cleanup();
 };
 

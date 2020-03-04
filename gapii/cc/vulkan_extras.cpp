@@ -1069,13 +1069,13 @@ uint32_t VulkanSpy::SpyOverride_vkQueueSubmit(CallObserver* observer,
                                               uint32_t submitCount,
                                               const VkSubmitInfo* pSubmits,
                                               VkFence fence) {
-  auto call_orig = [this, queue, submitCount, pSubmits, fence] {
+  auto call = [this, queue, submitCount, fence](const VkSubmitInfo* pSubmits) {
     VkDevice device = mState.Queues[queue]->mDevice;
     auto fn = mImports.mVkDeviceFunctions[device];
     return fn.vkQueueSubmit(queue, submitCount, pSubmits, fence);
   };
   if (!should_trace(kApiIndex)) {
-    return call_orig();
+    return call(pSubmits);
   }
   bool hasExternalMemoryBarriers = false;
   for (uint32_t i = 0; i < submitCount && !hasExternalMemoryBarriers; ++i) {
@@ -1090,20 +1090,56 @@ uint32_t VulkanSpy::SpyOverride_vkQueueSubmit(CallObserver* observer,
     }
   }
   if (!hasExternalMemoryBarriers) {
-    VkDevice device = mState.Queues[queue]->mDevice;
-    auto fn = mImports.mVkDeviceFunctions[device];
-    return fn.vkQueueSubmit(queue, submitCount, pSubmits, fence);
+    return call(pSubmits);
   }
 
-  ExternalMemoryStaging staging(this, observer, queue, submitCount, pSubmits,
-                                fence);
-  if (VkResult::VK_SUCCESS != staging.CreateResources()) return call_orig();
-  if (VkResult::VK_SUCCESS != staging.RecordCommandBuffers())
-    return call_orig();
-  if (VkResult::VK_SUCCESS != staging.Submit()) return call_orig();
-  staging.SendData();
-  staging.Cleanup();
-  return VkResult::VK_SUCCESS;
+  std::vector<VkSubmitInfo> submissions(pSubmits, pSubmits + submitCount);
+
+  for (size_t submitIndex = 0; submitIndex < submissions.size();
+       ++submitIndex) {
+    auto& submission = submissions[submitIndex];
+    mPendingExternObs.emplace_back(this, queue, submission);
+    ExternalMemoryStaging& staging = mPendingExternObs.back();
+    if (!staging.HasExternalMemoryObservations()) {
+      mPendingExternObs.pop_back();
+    } else {
+      if (VkResult::VK_SUCCESS != staging.CreateResources()) {
+        GAPID_ERROR("Failed at creating resources to fetch external memory");
+        continue;
+      }
+      if (VkResult::VK_SUCCESS != staging.RecordCommandBuffers()) {
+        GAPID_ERROR("Failed at recording buffer to fetch external memory");
+        continue;
+      }
+      staging.SendExtra((uint32_t)submitIndex, observer);
+    }
+  }
+  return call(submissions.data());
+}
+
+void VulkanSpy::flushReadyExternMemObs(CallObserver* observer) {
+  auto it = mPendingExternObs.begin();
+  for (auto& ext : mPendingExternObs) {
+    if (ext.IsReady()) {
+      ext.SendData(observer);
+      ext.Cleanup();
+    } else {
+      *it = ext;
+      ++it;
+    }
+  }
+  mPendingExternObs.erase(it, mPendingExternObs.end());
+}
+
+void VulkanSpy::flushUnblockedExternMemObs(CallObserver* observer) {
+  while (true) {
+    bool all_blocked = true;
+    for (const auto& ext : mPendingExternObs) {
+      all_blocked &= ext.IsBlocked();
+    }
+    if (all_blocked) return;
+    flushReadyExternMemObs(observer);
+  }
 }
 
 void VulkanSpy::recordWaitedSemaphores(CallObserver* observer, VkDevice device,

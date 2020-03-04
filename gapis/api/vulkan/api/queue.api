@@ -259,6 +259,8 @@ cmd VkResult vkQueueSubmit(
   }
   fence // 'fence' keyword, marking the point where observed memory writes become visible
 
+  flushReadyExternMemObs()
+
   return ?
 }
 

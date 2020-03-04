@@ -43,6 +43,9 @@
 {{else}}
   #include "gapii/cc/gles_spy.h"
 {{end}}
+{{if (eq (Global "API") "vulkan")}}
+  #include "gapii/cc/vulkan_external_memory.h"
+{{end}}
   #include "gapii/cc/call_observer.h"
   #include "gapii/cc/state_serializer.h"
 ¶

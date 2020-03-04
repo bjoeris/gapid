@@ -553,3 +553,6 @@ func (e externs) recordEndCommandBuffer(commandBuffer VkCommandBuffer) {
 func (e externs) onesCount(a uint32) uint32 {
 	return (uint32)(bits.OnesCount32(a))
 }
+
+func (e externs) flushReadyExternMemObs()     {}
+func (e externs) flushUnblockedExternMemObs() {}

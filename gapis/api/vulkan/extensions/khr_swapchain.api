@@ -407,6 +407,7 @@ cmd VkResult vkQueuePresentKHR(
             results[i] = result
         }*/
   }
+  flushUnblockedExternMemObs()
   return ?
 }
 

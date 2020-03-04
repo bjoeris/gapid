@@ -314,6 +314,7 @@ func (API) ResolveSynchronization(ctx context.Context, d *sync.Data, c *path.Cap
 	}
 
 	blockedCommands := []api.CmdID{}
+	externObs := map[uint64]*ExternalMemoryObservation{}
 
 	err = api.ForeachCmd(ctx, cmds, true, func(ctx context.Context, id api.CmdID, cmd api.Cmd) error {
 		i = id
@@ -321,6 +322,17 @@ func (API) ResolveSynchronization(ctx context.Context, d *sync.Data, c *path.Cap
 			return fmt.Errorf("Fail to mutate command %v: %v", cmd, err)
 		}
 		syncCouldHaveChanged := false
+
+		for _, o := range GetExternalMemoryObservations(cmd.Extras()) {
+			externObs[o.ObservationID] = o
+		}
+
+		for _, d := range GetExternalMemoryData(cmd.Extras()) {
+			if o, ok := externObs[d.ObservationID]; ok {
+				o.ResourceID = d.ResourceID
+			}
+		}
+
 		switch cmd := cmd.(type) {
 		case *VkQueueSubmit:
 			refs := []sync.SubcommandReference{}

@@ -1211,17 +1211,17 @@ func (a *VkAllocateMemory) Mutate(ctx context.Context, id api.CmdID, s *api.Glob
 }
 
 type vkQueueSubmitHijack struct {
-	ctx               context.Context
-	id                api.CmdID
-	s                 *api.GlobalState
-	b                 *builder.Builder
-	c                 *State
-	origSubmit        *VkQueueSubmit
-	hijackSubmit      *VkQueueSubmit
-	cb                CommandBuilder
-	origSubmitInfos   []VkSubmitInfo
-	hijackSubmitInfos *[]VkSubmitInfo
-	allocated         []*api.AllocResult
+	ctx                 context.Context
+	id                  api.CmdID
+	s                   *api.GlobalState
+	b                   *builder.Builder
+	c                   *State
+	origSubmit          *VkQueueSubmit
+	hijackedSubmit      *VkQueueSubmit
+	cb                  CommandBuilder
+	origSubmitInfos     []VkSubmitInfo
+	hijackedSubmitInfos *[]VkSubmitInfo
+	allocated           []*api.AllocResult
 }
 
 func newVkQueueSubmitHijack(
@@ -1236,20 +1236,20 @@ func newVkQueueSubmitHijack(
 	submitCount := uint64(a.SubmitCount())
 	submitInfos := a.PSubmits().Slice(0, submitCount, s.MemoryLayout).MustRead(ctx, a, s, nil)
 	return vkQueueSubmitHijack{
-		ctx:          ctx,
-		id:           id,
-		s:            s,
-		b:            b,
-		c:            GetState(s),
-		origSubmit:   a,
-		hijackSubmit: nil,
+		ctx:            ctx,
+		id:             id,
+		s:              s,
+		b:              b,
+		c:              GetState(s),
+		origSubmit:     a,
+		hijackedSubmit: nil,
 		cb: CommandBuilder{
 			Thread: a.Thread(),
 			Arena:  s.Arena,
 		},
-		origSubmitInfos:   submitInfos,
-		hijackSubmitInfos: nil,
-		allocated:         []*api.AllocResult{},
+		origSubmitInfos:     submitInfos,
+		hijackedSubmitInfos: nil,
+		allocated:           []*api.AllocResult{},
 	}
 }
 
@@ -1261,47 +1261,56 @@ func (h *vkQueueSubmitHijack) cleanup() {
 }
 
 func (h *vkQueueSubmitHijack) get() *VkQueueSubmit {
-	if h.hijackSubmit != nil {
-		return h.hijackSubmit
+	if h.hijackedSubmit != nil {
+		return h.hijackedSubmit
 	} else {
 		return h.origSubmit
 	}
 }
 
 func (h *vkQueueSubmitHijack) hijack() *VkQueueSubmit {
-	if h.hijackSubmit == nil {
-		h.hijackSubmit = h.cb.VkQueueSubmit(
+	if h.hijackedSubmit == nil {
+		h.hijackedSubmit = h.cb.VkQueueSubmit(
 			h.origSubmit.Queue(),
 			h.origSubmit.SubmitCount(),
 			h.origSubmit.PSubmits(),
 			h.origSubmit.Fence(),
 			h.origSubmit.Result(),
 		)
-		h.hijackSubmit.Extras().MustClone(h.origSubmit.Extras().All()...)
+		h.hijackedSubmit.Extras().MustClone(h.origSubmit.Extras().All()...)
 	}
-	return h.hijackSubmit
+	return h.hijackedSubmit
 }
 
 func (h *vkQueueSubmitHijack) mutate() error {
-	if h.hijackSubmitInfos != nil {
-		pSubmits := h.mustAllocData(*h.hijackSubmitInfos)
-		h.hijack().SetSubmitCount(uint32(len(*h.hijackSubmitInfos)))
+	if h.hijackedSubmitInfos != nil {
+		pSubmits := h.mustAllocData(*h.hijackedSubmitInfos)
+		h.hijack().SetSubmitCount(uint32(len(*h.hijackedSubmitInfos)))
 		h.hijack().SetPSubmits(NewVkSubmitInfoᶜᵖ(pSubmits.Ptr()))
 		h.hijack().AddRead(pSubmits.Data())
 	}
 	return h.get().mutate(h.ctx, h.id, h.s, h.b, nil)
 }
 
+func (h *vkQueueSubmitHijack) hijackSubmitInfos() []VkSubmitInfo {
+	if h.hijackedSubmitInfos == nil {
+		newSubmitInfos := make([]VkSubmitInfo, len(h.origSubmitInfos))
+		h.hijackedSubmitInfos = &newSubmitInfos
+		copy(*h.hijackedSubmitInfos, h.origSubmitInfos)
+	}
+	return *h.hijackedSubmitInfos
+}
+
 func (h *vkQueueSubmitHijack) submitInfos() []VkSubmitInfo {
-	if h.hijackSubmitInfos != nil {
-		return *h.hijackSubmitInfos
+	if h.hijackedSubmitInfos != nil {
+		return *h.hijackedSubmitInfos
 	} else {
 		return h.origSubmitInfos
 	}
 }
 
 func (h *vkQueueSubmitHijack) setSubmitInfos(submitInfos []VkSubmitInfo) {
-	h.hijackSubmitInfos = &submitInfos
+	h.hijackedSubmitInfos = &submitInfos
 }
 
 func (h *vkQueueSubmitHijack) mustAllocData(v ...interface{}) api.AllocResult {

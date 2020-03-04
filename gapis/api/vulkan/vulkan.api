@@ -153,6 +153,8 @@ extern ref!FetchedImageMemoryRequirements fetchImageMemoryRequirements(VkDevice 
 extern VkMemoryRequirements fetchBufferMemoryRequirements(VkDevice device, VkBuffer buffer)
 extern ref!LinearImageLayouts fetchLinearImageSubresourceLayouts(VkDevice device, ref!ImageObject image, VkImageSubresourceRange rng)
 extern ref!DescriptorInfo fetchUsedDescriptors(ref!ShaderModuleObject pipeline)
+extern void flushReadyExternMemObs()
+extern void flushUnblockedExternMemObs()
 extern void externalWait(VkDevice device)
 
 ///////////////////////

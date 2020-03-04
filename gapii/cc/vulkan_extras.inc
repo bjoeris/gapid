@@ -204,6 +204,7 @@ uint32_t SpyOverride_vkQueueSubmit(
     VkFence                                     fence);
 
 friend struct ExternalMemoryStaging;
+std::vector<ExternalMemoryStaging> mPendingExternObs;
 
 std::vector<VkBufferImageCopy> BufferImageCopies(
     gapil::Ref<ImageObject> img, const VkImageSubresourceRange& img_rng,
