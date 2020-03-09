@@ -116,6 +116,10 @@ func (f *Functions) Decompose(ty semantic.Type) semantic.Type {
 	}
 }
 
+func (f *Functions) AllBuiltins() []*semantic.Builtin {
+	return semantic.BuiltinTypes
+}
+
 // AllCommands returns a list of all cmd entries for a given API, regardless
 // of whether they are free functions, class methods or pseudonym methods.
 func (f *Functions) AllCommands(api interface{}) ([]*semantic.Function, error) {
