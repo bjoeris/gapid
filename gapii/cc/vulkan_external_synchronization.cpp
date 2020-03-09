@@ -15,6 +15,7 @@
  */
 
 #include "gapii/cc/vulkan_spy.h"
+#include "gapii/cc/vulkan_layer_extras.h"
 #include "gapii/cc/vulkan_external_synchronization.h"
 #include "gapis/api/vulkan/vulkan_pb/extras.pb.h"
 
@@ -43,6 +44,7 @@ uint32_t VulkanSpy::SpyOverride_vkGetFenceFdKHR(
   auto it = mExternalSync.find(device);
   if(it == mExternalSync.end()) {
     GAPID_ERROR("VkGetFenceFd called for device with no ExternalSyncState");
+    return VkResult::VK_ERROR_VALIDATION_FAILED_EXT;
   } else {
     return it->second.getFenceFd(*pGetFdInfo, pFd);
   }
@@ -86,7 +88,6 @@ uint32_t VulkanSpy::SpyOverride_vkCreateFence(
   if(res != VkResult::VK_SUCCESS)
     return res;
 
-  const VkExportFenceCreateInfo *pExportInfo = nullptr;
   const VulkanStructHeader *pNext = reinterpret_cast<const VulkanStructHeader*>(pCreateInfo->mpNext);
   while(pNext != nullptr) {
     if(pNext->mSType == VkStructureType::VK_STRUCTURE_TYPE_EXPORT_FENCE_CREATE_INFO) {
@@ -115,7 +116,11 @@ uint32_t ExternalSyncState::Initialize() {
     VkDeviceCreateInfo info(spy->arena());
     info.msType = VkStructureType::VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
     info.mqueueCreateInfoCount = 1;
-    VkDeviceQueueCreateInfo queueInfo(spy->arena);
+    VkDeviceQueueCreateInfo queueInfo(spy->arena());
+    queueInfo.msType = VkStructureType::VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+    queueInfo.mqueueCount = 1;
+    float priority = 1.0f;
+    queueInfo.mpQueuePriorities = &priority;
     info.mpQueueCreateInfos = &queueInfo;
     std::vector<const char *> extensions{
       "VK_KHR_get_physical_device_properties2",
@@ -126,21 +131,40 @@ uint32_t ExternalSyncState::Initialize() {
     info.menabledExtensionCount = (uint32_t)extensions.size();
     info.mppEnabledExtensionNames = extensions.data();
     uint32_t res = instanceFn.vkCreateDevice(physDev, &info, nullptr, &externDevice);
+    set_dispatch_from_parent((void*)externDevice, (void*)physDev);
     if(res != VkResult::VK_SUCCESS)
       return res;
   }
   auto deviceFn =spy->mImports.mVkDeviceFunctions[externDevice];
   deviceFn.vkGetDeviceQueue(externDevice, 0, 0, &fenceQueue);
+  return VkResult::VK_SUCCESS;
+}
+
+ExternalSyncState::ExternalSyncState(ExternalSyncState&& other) {
+  spy = other.spy;
+  other.spy = nullptr;
+  appDevice = other.appDevice;
+  other.appDevice = 0;
+  externDevice = other.externDevice;
+  other.externDevice = 0;
+  fenceQueue = other.fenceQueue;
+  other.fenceQueue = 0;
+  fences = std::move(other.fences);
 }
 
 ExternalSyncState::~ExternalSyncState() {
-  auto fn = spy->mImports.mVkDeviceFunctions[externDevice];
   for(auto &e : fences) {
     destroyFenceState(e.second);
   }
   fences.clear();
-  fn.vkDestroyDevice(externDevice, nullptr);
-  externDevice = 0;
+  if (externDevice != 0) {
+    auto fn = spy->mImports.mVkDeviceFunctions[externDevice];
+    fn.vkDestroyDevice(externDevice, nullptr);
+    externDevice = 0;
+    fenceQueue = 0;
+  }
+  appDevice = 0;
+  spy = nullptr;
 }
 
 void ExternalSyncState::destroyFenceState(ExternalFenceState& fenceState) {
@@ -272,7 +296,6 @@ void ExternalSyncState::sendFenceReset(VkFence fence, CallObserver *observer) {
   observer->encodeAndDelete(extra);
 }
 
-// TODO: call this from vkCreateFence
 uint32_t ExternalSyncState::createExportFence(VkFence appFence, const VkExportFenceCreateInfo &exportInfo) {
   auto appDevFn = spy->mImports.mVkDeviceFunctions[appDevice];
   auto extDevFn = spy->mImports.mVkDeviceFunctions[externDevice];
@@ -396,6 +419,7 @@ uint32_t ExternalSyncState::importFenceFd(const VkImportFenceFdInfoKHR &importIn
   res = extDevFn.vkImportFenceFdKHR(externDevice, &extImport);
   if(res != VkResult::VK_SUCCESS)
     return res;
+  return VkResult::VK_SUCCESS;
 }
 
 uint32_t ExternalSyncState::resetFences(uint32_t fenceCount, const VkFence* pFences) {

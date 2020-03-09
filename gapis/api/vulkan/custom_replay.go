@@ -898,7 +898,7 @@ func (a *VkResetFences) Mutate(ctx context.Context, id api.CmdID, s *api.GlobalS
 	return a.mutate(ctx, id, s, b, w)
 }
 
-func externalWait(ctx context.Context, cmd api.Cmd, s *api.GlobalState, b *builder.Builder, device VkDevice) error {
+func externalWait(ctx context.Context, cb CommandBuilder, s *api.GlobalState, b *builder.Builder, device VkDevice) error {
 	// wait on every every previously signaled external fence/semaphore that has not already been waited on
 	c := GetState(s)
 	extFences := c.externalFenceSignals[device]
@@ -908,7 +908,6 @@ func externalWait(ctx context.Context, cmd api.Cmd, s *api.GlobalState, b *build
 		for f := range extFences {
 			extFencesSlice = append(extFencesSlice, f)
 		}
-		cb := CommandBuilder{Thread: cmd.Thread(), Arena: s.Arena}
 		pFences := s.AllocDataOrPanic(ctx, extFencesSlice)
 		defer pFences.Free()
 		wait := cb.VkWaitForFences(
@@ -938,7 +937,7 @@ func (a *VkGetFenceStatus) Mutate(ctx context.Context, id api.CmdID, s *api.Glob
 		}
 	}
 	if f.TemporaryExternal() || f.PermanentExternal() {
-		externalWait(ctx, a, s, b, a.Device())
+		externalWait(ctx, cb, s, b, a.Device())
 	}
 	return nil
 }
@@ -966,8 +965,9 @@ func (a *VkWaitForFences) Mutate(ctx context.Context, id api.CmdID, s *api.Globa
 			newFences = append(newFences, f)
 		}
 	}
+	cb := CommandBuilder{Thread: a.Thread(), Arena: s.Arena}
 	if hasExternalFence {
-		externalWait(ctx, a, s, b, a.Device())
+		externalWait(ctx, cb, s, b, a.Device())
 	}
 	newFenceCount := uint32(len(newFences))
 	if 0 == len(newFences) {
@@ -975,10 +975,6 @@ func (a *VkWaitForFences) Mutate(ctx context.Context, id api.CmdID, s *api.Globa
 	} else if newFenceCount < a.FenceCount() {
 		pFences := s.AllocDataOrPanic(ctx, newFences)
 		defer pFences.Free()
-		cb := CommandBuilder{
-			Thread: a.Thread(),
-			Arena:  s.Arena,
-		}
 		hijack := cb.VkWaitForFences(
 			a.Device(),
 			newFenceCount,
@@ -1331,28 +1327,28 @@ func (h *vkQueueSubmitHijack) mustAlloc(size uint64) api.AllocResult {
 	return res
 }
 
-func (h *vkQueueSubmitHijack) processFence() {
+func (h *vkQueueSubmitHijack) processFence() error {
 	if h.get().Fence() != 0 {
 		f := h.c.Fences().Get(h.get().Fence())
 		if f.PermanentExternal() || f.TemporaryExternal() {
 			if f.Signaled() {
 				// State tracking indicates the fence is already signaled when it is submitted to this queue submit.
 				// This is invalid, but the fence is external, so we can assume the external process must have reset the fence.
-				if _, ok := h.c.externalFenceSignals[f.Device()][f.Handle()] {
+				if _, ok := h.c.externalFenceSignals[f.Device()][f.VulkanHandle()]; ok {
 					// The captured application signaled the fence twice without waiting on any Vulkan external synchronization in between.
 					// However, the captured application and the external process could have been synchronizing by some other means,
 					// so we must assume the external process waited on and reset the fence before this queue submit call was executed in the captured application.
-					externalWait(h.ctx, h.id, h.s, h.b, f.Device())
+					externalWait(h.ctx, h.cb, h.s, h.b, f.Device())
 				}
 				// Insert a vkResetFences call into the replay, so that the fence is in the correct state for the vkQueueSubmit call
-				pFences := h.mustAllocData([]VkFence{f.VulkanHandle})
+				pFences := h.mustAllocData(f.VulkanHandle())
 				err := h.cb.VkResetFences(
 					f.Device(),
 					1,
-					pFences,
+					pFences.Ptr(),
 					VkResult_VK_SUCCESS,
 				).AddRead(
-					pFences,
+					pFences.Data(),
 				).Mutate(
 					h.ctx, api.CmdNoID, h.s, h.b, nil,
 				)
@@ -1361,10 +1357,10 @@ func (h *vkQueueSubmitHijack) processFence() {
 				}
 			}
 			if extFences, ok := h.c.externalFenceSignals[f.Device()]; ok {
-				extFences[f.Handle] = struct{}{}
+				extFences[f.VulkanHandle()] = struct{}{}
 			} else {
 				extFences = make(map[VkFence]struct{})
-				extFences[f.Handle()] = struct{}{}
+				extFences[f.VulkanHandle()] = struct{}{}
 				h.c.externalFenceSignals[f.Device()] = extFences
 			}
 		}
@@ -1426,7 +1422,9 @@ func (a *VkQueueSubmit) Mutate(ctx context.Context, id api.CmdID, s *api.GlobalS
 	}
 	h := newVkQueueSubmitHijack(ctx, a, id, s, b, w)
 	defer h.cleanup()
-	h.processFence()
+	if err := h.processFence(); err != nil {
+		return err
+	}
 	h.processSemaphores()
 	h.processExternalMemory()
 	return h.mutate()

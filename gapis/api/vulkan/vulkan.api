@@ -155,7 +155,7 @@ extern ref!LinearImageLayouts fetchLinearImageSubresourceLayouts(VkDevice device
 extern ref!DescriptorInfo fetchUsedDescriptors(ref!ShaderModuleObject pipeline)
 extern void flushReadyExternMemObs()
 extern void flushUnblockedExternMemObs()
-extern void externalWait(VkDevice device)
+//extern void externalWait(VkDevice device)
 
 ///////////////////////
 // Function pointers //

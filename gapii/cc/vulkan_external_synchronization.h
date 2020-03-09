@@ -53,6 +53,8 @@ class VulkanSpy;
 
 class ExternalSyncState {
 public:
+  ExternalSyncState(const ExternalSyncState&) = delete;
+  ExternalSyncState(ExternalSyncState&& other);
   inline ExternalSyncState(VulkanSpy *spy, VkDevice device) : spy(spy), appDevice(device) {}
   ~ExternalSyncState();
   uint32_t Initialize();
