@@ -130,6 +130,7 @@ class VkDebugUtilsMessengerCreateInfoEXT {
     void*                                pUserData
 }
 
+@extension("VK_EXT_debug_utils")
 class VkDebugUtilsMessengerCallbackDataEXT {
     VkStructureType                           sType
     const void*                               pNext

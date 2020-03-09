@@ -16,7 +16,12 @@
 // VK_GGP_stream_descriptor_surface
 // ----------------------------------------------------------------------------
 
+@platform("VK_USE_PLATFORM_GGP")
+@extension("VK_GGP_stream_descriptor_surface")
 type VkFlags VkStreamDescriptorSurfaceCreateFlagsGGP
+
+@platform("VK_USE_PLATFORM_GGP")
+@extension("VK_GGP_stream_descriptor_surface")
 type u32 GgpStreamDescriptor
 
 @platform("VK_USE_PLATFORM_GGP")
