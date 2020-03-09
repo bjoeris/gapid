@@ -898,7 +898,7 @@ func (a *VkResetFences) Mutate(ctx context.Context, id api.CmdID, s *api.GlobalS
 	return a.mutate(ctx, id, s, b, w)
 }
 
-func externalWait(ctx context.Context, cmd api.Cmd, s *api.GlobalState, b *builder.Builder, device VkDevice) {
+func externalWait(ctx context.Context, cmd api.Cmd, s *api.GlobalState, b *builder.Builder, device VkDevice) error {
 	// wait on every every previously signaled external fence/semaphore that has not already been waited on
 	c := GetState(s)
 	extFences := c.externalFenceSignals[device]
@@ -919,11 +919,9 @@ func externalWait(ctx context.Context, cmd api.Cmd, s *api.GlobalState, b *build
 			math.MaxUint64,
 			VkResult_VK_SUCCESS)
 		wait.AddRead(pFences.Data())
-		if err := wait.mutate(ctx, api.CmdNoID, s, b, nil); err != nil {
-			// TODO: what should I do with this error?
-		}
+		return wait.mutate(ctx, api.CmdNoID, s, b, nil)
 	}
-
+	return nil
 }
 
 func (a *VkGetFenceStatus) Mutate(ctx context.Context, id api.CmdID, s *api.GlobalState, b *builder.Builder, w api.StateWatcher) error {
@@ -1337,14 +1335,41 @@ func (h *vkQueueSubmitHijack) processFence() {
 	if h.get().Fence() != 0 {
 		f := h.c.Fences().Get(h.get().Fence())
 		if f.PermanentExternal() || f.TemporaryExternal() {
-			h.c.externalFenceSignals[f.Device()][f.VulkanHandle()] = struct{}{}
 			if f.Signaled() {
-				// This fence was already signaled, so it is not valid to submit it.
-				// This could have been valid at trace time, since this was an external fence
-				h.hijack().SetFence(VkFence(0))
+				// State tracking indicates the fence is already signaled when it is submitted to this queue submit.
+				// This is invalid, but the fence is external, so we can assume the external process must have reset the fence.
+				if _, ok := h.c.externalFenceSignals[f.Device()][f.Handle()] {
+					// The captured application signaled the fence twice without waiting on any Vulkan external synchronization in between.
+					// However, the captured application and the external process could have been synchronizing by some other means,
+					// so we must assume the external process waited on and reset the fence before this queue submit call was executed in the captured application.
+					externalWait(h.ctx, h.id, h.s, h.b, f.Device())
+				}
+				// Insert a vkResetFences call into the replay, so that the fence is in the correct state for the vkQueueSubmit call
+				pFences := h.mustAllocData([]VkFence{f.VulkanHandle})
+				err := h.cb.VkResetFences(
+					f.Device(),
+					1,
+					pFences,
+					VkResult_VK_SUCCESS,
+				).AddRead(
+					pFences,
+				).Mutate(
+					h.ctx, api.CmdNoID, h.s, h.b, nil,
+				)
+				if err != nil {
+					return err
+				}
+			}
+			if extFences, ok := h.c.externalFenceSignals[f.Device()]; ok {
+				extFences[f.Handle] = struct{}{}
+			} else {
+				extFences = make(map[VkFence]struct{})
+				extFences[f.Handle()] = struct{}{}
+				h.c.externalFenceSignals[f.Device()] = extFences
 			}
 		}
 	}
+	return nil
 }
 
 func (h *vkQueueSubmitHijack) processSemaphores() {

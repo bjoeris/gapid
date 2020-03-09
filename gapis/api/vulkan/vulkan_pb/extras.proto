@@ -61,3 +61,19 @@ message SemaphoreState {
   repeated uint64 semaphores = 1;
   repeated uint64 values = 2;
 }
+
+enum SignalSource {
+  LOCAL = 0;
+  EXTERNAL = 1;
+}
+
+enum FenceStatus {
+  SIGNALED = 0;
+  UNSIGNALED = 2;
+}
+
+message FenceUpdate {
+  uint64 fence = 1;
+  SignalSource source = 2;
+  FenceStatus status = 3;
+}

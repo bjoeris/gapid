@@ -52,6 +52,7 @@
 
 @threadSafety("system")
 @indirect("VkDevice")
+@override
 cmd VkResult vkCreateFence(
     VkDevice                     device,
     const VkFenceCreateInfo*     pCreateInfo,
@@ -102,6 +103,7 @@ cmd void vkDestroyFence(
 @threadSafety("system")
 @indirect("VkDevice")
 @custom
+@override
 cmd VkResult vkResetFences(
     VkDevice       device,
     u32            fenceCount,
@@ -159,6 +161,7 @@ cmd VkResult vkGetFenceStatus(
 @threadsafe
 @alive
 @custom
+@override
 cmd VkResult vkWaitForFences(
     VkDevice       device,
     u32            fenceCount,

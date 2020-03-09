@@ -209,3 +209,38 @@ std::vector<ExternalMemoryStaging> mPendingExternObs;
 std::vector<VkBufferImageCopy> BufferImageCopies(
     gapil::Ref<ImageObject> img, const VkImageSubresourceRange& img_rng,
     VkDeviceSize &offset);
+
+friend class ExternalSyncState;
+std::unordered_map<VkDevice, ExternalSyncState> mExternalSync;
+
+uint32_t SpyOverride_vkWaitForFences(
+    CallObserver*                               observer, 
+    VkDevice                                    device,
+    uint32_t                                    fenceCount,
+    const VkFence*                              pFences,
+    VkBool32                                    waitAll,
+    uint64_t                                    timeout);
+
+uint32_t SpyOverride_vkResetFences(
+    CallObserver*                               observer,
+    VkDevice                                    device,
+    uint32_t                                    fenceCount,
+    const VkFence*                              pFences);
+
+uint32_t SpyOverride_vkGetFenceFdKHR(
+    CallObserver*                               observer, 
+    VkDevice                                    device,
+    const VkFenceGetFdInfoKHR*                  pGetFdInfo,
+    int*                                        pFd);
+
+uint32_t SpyOverride_vkImportFenceFdKHR(
+    CallObserver*                               observer,
+    VkDevice                                    device,
+    const VkImportFenceFdInfoKHR*               pImportFenceFdInfo);
+
+uint32_t SpyOverride_vkCreateFence(
+    CallObserver*                               observer,
+    VkDevice                                    device,
+    const VkFenceCreateInfo*                    pCreateInfo,
+    AllocationCallbacks                         pAllocator,
+    VkFence*                                    pFence);

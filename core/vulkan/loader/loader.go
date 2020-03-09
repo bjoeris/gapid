@@ -124,6 +124,8 @@ func SetupTrace(ctx context.Context, d bind.Device, abi *device.ABI, env *shell.
 		return cleanup.Invoke(ctx), "", err
 	}
 	env.AddPathStart("VK_LAYER_PATH", tempdir)
+	env.AddPathStart("VK_LAYER_PATH", "/usr/local/google/home/bjoeris/src/Vulkan-ValidationLayers/build/install/share/vulkan/explicit_layer.d")
+	env.AddPathStart("LD_LIBRARY_PATH", "/usr/local/google/home/bjoeris/src/Vulkan-ValidationLayers/build/install/lib")
 
 	f, c, err := d.TempFile(ctx)
 	if err != nil {
@@ -131,7 +133,7 @@ func SetupTrace(ctx context.Context, d bind.Device, abi *device.ABI, env *shell.
 	}
 	cleanup = cleanup.Then(c)
 	env.Set("LD_PRELOAD", lib).
-		AddPathStart("VK_INSTANCE_LAYERS", "GraphicsSpy").
+		AddPathStart("VK_INSTANCE_LAYERS", "GraphicsSpy", "VK_LAYER_LUNARG_api_dump", "VK_LAYER_KHRONOS_validation").
 		AddPathStart("VK_DEVICE_LAYERS", "GraphicsSpy").
 		Set("GAPII_PORT_FILE", f)
 	if abi.OS == device.Windows {

@@ -17,6 +17,8 @@
 #ifndef GAPII_VULKAN_EXTRAS_H_
 #define GAPII_VULKAN_EXTRAS_H_
 
+#include "gapii/cc/vulkan_external_synchronization.h"
+
 namespace gapii {
 
 // An invalid value of memory type index

@@ -228,6 +228,16 @@
         if (should_record_timestamps()) {
           observer->observeTimestamp();
         }
+        {{if GetAnnotation $ "indirect"}}
+          {{$annotations := (GetAnnotation $ "indirect").Arguments}}
+          {{if and (eq (len $annotations) 1) (eq "VkDevice" (index $annotations 0))}}
+            {
+              auto externSyncIt = mExternalSync.find({{(index $.CallParameters 0).Name}});
+              if (externSyncIt != mExternalSync.end())
+                externSyncIt->second.updateFences(observer);
+            }
+          {{end}}
+        {{end}}
 
         {{if (GetAnnotation $ "threadsafe")}}
         unlock();

@@ -72,6 +72,7 @@ class VkFenceGetFdInfoKHR {
 @threadSafety("system")
 @indirect("VkDevice")
 @custom
+@override
 cmd VkResult vkImportFenceFdKHR(
     VkDevice                                    device,
     const VkImportFenceFdInfoKHR*               pImportFenceFdInfo) {
@@ -106,6 +107,7 @@ cmd VkResult vkImportFenceFdKHR(
 @threadSafety("system")
 @indirect("VkDevice")
 @custom
+@override
 cmd VkResult vkGetFenceFdKHR(
     VkDevice                                    device,
     const VkFenceGetFdInfoKHR*                  pGetFdInfo,

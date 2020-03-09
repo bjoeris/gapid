@@ -1069,6 +1069,10 @@ uint32_t VulkanSpy::SpyOverride_vkQueueSubmit(CallObserver* observer,
                                               uint32_t submitCount,
                                               const VkSubmitInfo* pSubmits,
                                               VkFence fence) {
+  auto fenceObj = mState.Fences[fence];
+  if(fenceObj->mPermanentExternal || fenceObj->mTemporaryExternal) {
+    // TODO
+  }
   auto call = [this, queue, submitCount, fence](const VkSubmitInfo* pSubmits) {
     VkDevice device = mState.Queues[queue]->mDevice;
     auto fn = mImports.mVkDeviceFunctions[device];
