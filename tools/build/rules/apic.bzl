@@ -188,6 +188,8 @@ def _apic_template_impl(ctx):
                 outputs[0].dirname,
                 "--search",
                 api_search_path(apilist),
+                "--templatesearch",
+                api_search_path(templatelist),
                 api.main.path,
                 template.main.path,
             ],
