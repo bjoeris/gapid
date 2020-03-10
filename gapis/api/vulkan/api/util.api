@@ -16,11 +16,6 @@
   void* Ptr
 }
 
-type void* VoidPtr
-
-// Declare the type so external function: numberOfPNext can use the type.
-type const void** ConstVoidPtrPtr
-
 // Returns the number of structs in the linked list pointed by the pNext pointer.
 extern u32 numberOfPNext(const void* pNext)
 
