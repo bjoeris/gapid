@@ -50,6 +50,10 @@ class RecursiveSpinLock {
     }
   }
 
+  size_t Count() {
+    return count_;
+  }
+
  private:
   std::atomic<std::thread::id> owning_id_;
   // count_ does not have to be atomic, since it is only

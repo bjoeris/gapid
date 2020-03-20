@@ -126,6 +126,7 @@ func SetupTrace(ctx context.Context, d bind.Device, abi *device.ABI, env *shell.
 	env.AddPathStart("VK_LAYER_PATH", tempdir)
 	env.AddPathStart("VK_LAYER_PATH", "/usr/local/google/home/bjoeris/src/Vulkan-ValidationLayers/build/install/share/vulkan/explicit_layer.d")
 	env.AddPathStart("LD_LIBRARY_PATH", "/usr/local/google/home/bjoeris/src/Vulkan-ValidationLayers/build/install/lib")
+	env.AddPathStart("LD_LIBRARY_PATH", "/usr/local/google/home/bjoeris/src/Vulkan-Loader/build/install/lib")
 
 	f, c, err := d.TempFile(ctx)
 	if err != nil {

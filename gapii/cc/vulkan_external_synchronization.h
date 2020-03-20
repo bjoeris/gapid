@@ -50,13 +50,14 @@ struct ExternalFenceState {
 };
 
 class VulkanSpy;
+class ExternalSyncState;
 
-class ExternalSyncState {
+class ExternalSyncDeviceState {
 public:
-  ExternalSyncState(const ExternalSyncState&) = delete;
-  ExternalSyncState(ExternalSyncState&& other);
-  inline ExternalSyncState(VulkanSpy *spy, VkDevice device) : spy(spy), appDevice(device) {}
-  ~ExternalSyncState();
+  ExternalSyncDeviceState(const ExternalSyncDeviceState&) = delete;
+  ExternalSyncDeviceState(ExternalSyncDeviceState&& other);
+  ExternalSyncDeviceState(ExternalSyncState *parent, VkDevice device);
+  ~ExternalSyncDeviceState();
   uint32_t Initialize();
   // Returns a new fence that should replace the original fence in the queue submission.
   // VkFence submitExternalFence(VkFence fence);
@@ -69,11 +70,15 @@ public:
   uint32_t importFenceFd(const VkImportFenceFdInfoKHR &info);
   uint32_t resetFences(uint32_t fenceCount, const VkFence* pFences);
 
+  inline const VulkanImports::VkDeviceFunctions &functions() const { return mFunctions; }
+
 protected:
-  VulkanSpy *spy = nullptr;
-  VkDevice appDevice = 0;
-  VkDevice externDevice = 0;
-  VkQueue fenceQueue = 0;
+  VulkanImports::VkDeviceFunctions mFunctions;
+  ExternalSyncState *mParent = nullptr;
+  VulkanSpy *mSpy = nullptr;
+  VkDevice mAppDevice = 0;
+  VkDevice mExternDevice = 0;
+  VkQueue mFenceQueue = 0;
   std::map<VkFence, ExternalFenceState> fences;
   // std::thread fenceThread;
   // std::atomic<bool> fenceThreadShouldQuit;
@@ -86,6 +91,50 @@ protected:
   // void fenceThreadEntry();
 };
 
+class ExternalSyncState {
+public:
+  inline ExternalSyncState(VulkanSpy *spy) : mSpy(spy) {};
+  ExternalSyncState(const ExternalSyncState&) = delete;
+  inline ExternalSyncState(ExternalSyncState&& other) {
+    mSpy = other.mSpy;
+    other.mSpy = nullptr;
+    mInstance = other.mInstance;
+    other.mInstance = 0;
+  }
+  ~ExternalSyncState();
+
+  inline bool HasExternDevice(VkDevice app_device) {
+    return mDevices.find(app_device) != mDevices.end();
+  }
+  inline ExternalSyncDeviceState &GetOrCreateExternDevice(VkDevice app_device) {
+    auto it = mDevices.find(app_device);
+    if (it == mDevices.end()) {
+      Initialize();
+      it = mDevices.emplace(app_device, ExternalSyncDeviceState(this, app_device)).first;
+      it->second.Initialize();
+    }
+    return it->second;
+  }
+  inline ExternalSyncDeviceState *FindExternDevice(VkDevice app_device) {
+    auto it = mDevices.find(app_device);
+    if (it == mDevices.end()) {
+      return nullptr;
+    }
+    return &it->second;
+  }
+  inline VkInstance instance() const { return mInstance; }
+  inline const VulkanImports::VkInstanceFunctions& functions() const { return mFunctions; }
+  inline VulkanSpy *spy() const { return mSpy; }
+protected:
+  uint32_t Initialize();
+
+  VulkanImports::VkInstanceFunctions mFunctions;
+  std::unordered_map<VkDevice, ExternalSyncDeviceState> mDevices;
+  VulkanSpy *mSpy = nullptr;
+  VkInstance mInstance = 0;
+};
+
+inline ExternalSyncDeviceState::ExternalSyncDeviceState(ExternalSyncState *parent, VkDevice device) : mParent(parent), mSpy(mParent->spy()), mAppDevice(device) {}
 
 }  // namespace gapii
 

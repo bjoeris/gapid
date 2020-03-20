@@ -211,7 +211,9 @@ std::vector<VkBufferImageCopy> BufferImageCopies(
     VkDeviceSize &offset);
 
 friend class ExternalSyncState;
-std::unordered_map<VkDevice, ExternalSyncState> mExternalSync;
+friend class ExternalSyncDeviceState;
+ExternalSyncState* mExternalSync;
+ExternalSyncState& external_sync();
 
 uint32_t SpyOverride_vkWaitForFences(
     CallObserver*                               observer, 

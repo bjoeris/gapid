@@ -125,6 +125,8 @@ class SpyBase {
   // resets the buffers reused between commands.
   void unlock();
 
+  size_t lock_count();
+
   // make constructs and returns a Slice backed by a new pool.
   template <typename T>
   inline gapil::Slice<T> make(CallObserver* cb, uint64_t count);

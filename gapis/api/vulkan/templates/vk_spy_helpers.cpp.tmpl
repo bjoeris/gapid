@@ -204,12 +204,7 @@ uint32_t VulkanSpy::SpyOverride_vkCreateInstance(
             // instance for all calls to vkCreateInstance.
             return VkResult::VK_ERROR_INITIALIZATION_FAILED;
         }
-        {{range $c := AllCommands $}}
-            {{if (Macro "IsIndirected" "Command" $c "IndirectOn" "VkInstance")}}
-                {{$name := Macro "CmdName" $c}}
-                insert_pt.first->second.{{$name}} = reinterpret_cast<gapii::VulkanImports::{{Template "C++.FunctionPtrType" $c}}>(get_instance_proc_addr(*pInstance, "{{$name}}"));
-            {{end}}
-        {{end}}
+        InitializeInstanceFunctions(*pInstance, get_instance_proc_addr, &insert_pt.first->second);
     }
     return result;
 }
@@ -287,12 +282,7 @@ uint32_t VulkanSpy::SpyOverride_vkCreateDevice(
         if (!insert_pt.second) {
             return VkResult::VK_ERROR_INITIALIZATION_FAILED;
         }
-        {{range $c := AllCommands $}}
-            {{if (Macro "IsIndirected" "Command" $c "IndirectOn" "VkDevice")}}
-                {{$name := Macro "CmdName" $c}}
-                insert_pt.first->second.{{$name}} = reinterpret_cast<gapii::VulkanImports::{{Template "C++.FunctionPtrType" $c}}>(get_device_proc_addr(*pDevice, "{{$name}}"));
-            {{end}}
-        {{end}}
+        InitializeDeviceFunctions(device, get_device_proc_addr, functions);
     }
 
     #if COHERENT_TRACKING_ENABLED
@@ -347,5 +337,25 @@ uint32_t VulkanSpy::SpyOverride_vkCreateDevice(
 
     return result;
 }
+
+
+void InitializeInstanceFunctions(VkInstance instance, gapii::VulkanImports::PFNVKGETINSTANCEPROCADDR get_instance_proc_addr, VulkanImports::VkInstanceFunctions* functions) {
+    {{range $c := AllCommands $}}
+        {{if (Macro "IsIndirected" "Command" $c "IndirectOn" "VkInstance")}}
+            {{$name := Macro "CmdName" $c}}
+            functions->{{$name}} = reinterpret_cast<gapii::VulkanImports::{{Template "C++.FunctionPtrType" $c}}>(get_instance_proc_addr(instance, "{{$name}}"));
+        {{end}}
+    {{end}}
+}
+
+void InitializeDeviceFunctions(VkDevice device, gapii::VulkanImports::PFNVKGETDEVICEPROCADDR get_device_proc_addr, VulkanImports::VkDeviceFunctions* functions) {
+    {{range $c := AllCommands $}}
+        {{if (Macro "IsIndirected" "Command" $c "IndirectOn" "VkDevice")}}
+            {{$name := Macro "CmdName" $c}}
+            functions->{{$name}} = reinterpret_cast<gapii::VulkanImports::{{Template "C++.FunctionPtrType" $c}}>(get_device_proc_addr(device, "{{$name}}"));
+        {{end}}
+    {{end}}
+}
+
 }
 {{end}}

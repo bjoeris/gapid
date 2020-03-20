@@ -36,6 +36,9 @@ uint32_t GetMemoryTypeIndexForStagingResources(
 // covered in the |bindings|.
 bool IsFullyBound(VkDeviceSize offset, VkDeviceSize size,
                   const U64ToVkSparseMemoryBind& bindings);
+
+void InitializeInstanceFunctions(VkInstance instance, VulkanImports::PFNVKGETINSTANCEPROCADDR get_instance_proc_addr, VulkanImports::VkInstanceFunctions* functions);
+void InitializeDeviceFunctions(VkDevice device, VulkanImports::PFNVKGETDEVICEPROCADDR get_device_proc_addr, VulkanImports::VkDeviceFunctions* functions);
 };  // namespace gapii
 
 #endif

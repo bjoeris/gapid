@@ -56,6 +56,8 @@ void SpyBase::lock() { mSpinLock.Lock(); }
 
 void SpyBase::unlock() { mSpinLock.Unlock(); }
 
+size_t SpyBase::lock_count() { return mSpinLock.Count(); }
+
 void SpyBase::abort() {
   GAPID_DEBUG("Command aborted");
   throw AbortException();
